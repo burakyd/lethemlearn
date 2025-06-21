@@ -235,8 +235,12 @@ NNInputsResult Player::get_nn_inputs(const Game& game) {
 
     // 8: Own size (normalized to default size)
     float size_norm = float(width) / float(DOT_WIDTH); // 1.0 = default size
-    // 9: Own food count (normalized, assume max 20)
+    // 9: Own food count (normalized, clipped after 20)
     float food_count_norm = std::min(1.0f, float(foodCount) / 20.0f);
+    // 10: Own normalized size (relative to max size)
+    float own_norm_size = float(width) / float(MAX_PLAYER_SIZE);
+    // 11: Own food count (again, for new input)
+    float own_food_count = food_count_norm;
     // 10-13: Wall distances (left, right, top, bottom, normalized)
     float left_wall = float(x) / game.width;
     float right_wall = float(game.width - (x + width)) / game.width;
@@ -271,12 +275,17 @@ NNInputsResult Player::get_nn_inputs(const Game& game) {
     this->smoothed_bottom_wall = alpha * bottom_wall + (1 - alpha) * this->smoothed_bottom_wall;
     this->smoothed_speed = alpha * speed_scaled + (1 - alpha) * this->smoothed_speed;
     this->smoothed_size_diff = alpha * size_diff + (1 - alpha) * this->smoothed_size_diff;
+    // Add smoothing for new inputs
+    this->smoothed_own_norm_size = alpha * own_norm_size + (1 - alpha) * this->smoothed_own_norm_size;
+    this->smoothed_own_food_count = alpha * own_food_count + (1 - alpha) * this->smoothed_own_food_count;
     std::array<float, NN_INPUTS> inputs = {
         this->smoothed_food_dist, this->smoothed_food_angle,
         this->smoothed_player_dist, this->smoothed_player_angle,
         this->smoothed_left_wall, this->smoothed_right_wall, this->smoothed_top_wall, this->smoothed_bottom_wall,
         this->smoothed_speed,
-        this->smoothed_size_diff // new input
+        this->smoothed_size_diff,
+        this->smoothed_own_norm_size,
+        this->smoothed_own_food_count
     };
     NNInputsResult result;
     result.inputs = inputs;

@@ -58,6 +58,8 @@ public:
     float smoothed_bottom_wall = 0.0f;
     float smoothed_speed = 0.0f;
     float smoothed_size_diff = 0.0f;
+    float smoothed_own_norm_size = 0.0f;
+    float smoothed_own_food_count = 0.0f;
     void initialize_weights_xavier();
     NNInputsResult get_nn_inputs(const Game& game);
     void apply_nn_output(const std::array<float, NN_OUTPUTS>& nn_output);

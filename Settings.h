@@ -46,17 +46,17 @@ constexpr bool KILL = true;
 constexpr bool PLAYER_ENABLED = true; // not truly implemented yet
 
 // Evolution Settings
-constexpr int MITOSIS = 10000; // 1/MITOSIS chance of mitosis
+constexpr int MITOSIS = 15000; // 1/MITOSIS chance of mitosis
 constexpr bool DO_MUTATE = true;
 constexpr int NUMBER_OF_MUTATES = 3;
 
 // Neural Network Configuration
 // Hidden layers can be adjusted or another layer can be added
 // Don't change the input and output layers, unless it is for a logic change.
-constexpr int NN_INPUTS = 10;
-constexpr int NN_H1 = 8;
-constexpr int NN_H2 = 8;
-constexpr int NN_H3 = 8;
+constexpr int NN_INPUTS = 12;
+constexpr int NN_H1 = 12;
+constexpr int NN_H2 = 24;
+constexpr int NN_H3 = 12;
 constexpr int NN_OUTPUTS = 2;
 
 constexpr std::array<std::tuple<int, int>, 4> NEURAL_NET_SHAPE = {

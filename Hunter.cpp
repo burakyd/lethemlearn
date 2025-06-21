@@ -39,6 +39,8 @@ void Hunter::update(Game& game) {
         if (p == this || !p->alive) continue;
         if (dynamic_cast<Hunter*>(p) != nullptr) continue;
         if (std::find(already_targeted.begin(), already_targeted.end(), p) != already_targeted.end()) continue;
+        // Only target players the hunter can eat - so they won't aimlessly chase a bigger player
+        if (height <= p->height * 1.2f) continue;
         float dx = p->x - x;
         float dy = p->y - y;
         float dist = dx*dx + dy*dy;
@@ -47,11 +49,13 @@ void Hunter::update(Game& game) {
             target = p;
         }
     }
-    // If all players are already targeted, fallback to nearest
+    // If all players are already targeted, fallback to nearest the hunter can eat
     if (!target) {
         for (auto* p : game.players) {
             if (p == this || !p->alive) continue;
             if (dynamic_cast<Hunter*>(p) != nullptr) continue;
+            // Only target players the hunter can eat
+            if (height <= p->height * 1.2f) continue;
             float dx = p->x - x;
             float dy = p->y - y;
             float dist = dx*dx + dy*dy;
