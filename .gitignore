@@ -1,0 +1,47 @@
+# Build directories
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+*.out
+*.a
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.app
+*.dSYM/
+
+# Visual Studio files
+*.vcxproj*
+*.sln
+*.user
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Mac OS files
+.DS_Store
+
+# Windows files
+Thumbs.db
+Desktop.ini
+
+# Editor files
+*.swp
+*~
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Generated files
+gene_pool.txt 
