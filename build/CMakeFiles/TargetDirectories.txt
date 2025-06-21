@@ -1,0 +1,3 @@
+C:/Pythonii (B)/still hurts/let'em learn/pygame/v12_/AIM_cpp/build/CMakeFiles/AI_Simulation_CPP.dir
+C:/Pythonii (B)/still hurts/let'em learn/pygame/v12_/AIM_cpp/build/CMakeFiles/edit_cache.dir
+C:/Pythonii (B)/still hurts/let'em learn/pygame/v12_/AIM_cpp/build/CMakeFiles/rebuild_cache.dir
