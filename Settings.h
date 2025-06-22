@@ -68,13 +68,13 @@ constexpr std::array<std::tuple<int, int>, 4> NEURAL_NET_SHAPE = {
 
 // This is done after normalization to [-1,1], so the players are more sensitive to environmental changes
 // Can be individually changed to increase/decrease the effect of a feature
-constexpr float SCALE_FOOD_DIST = 30.0f;
-constexpr float SCALE_FOOD_ANGLE = 30.0f;
-constexpr float SCALE_PLAYER_DIST = 50.0f;
-constexpr float SCALE_PLAYER_ANGLE = 50.0f;
+constexpr float SCALE_FOOD_DIST = 50.0f;
+constexpr float SCALE_FOOD_ANGLE = 50.0f;
+constexpr float SCALE_PLAYER_DIST = 30.0f;
+constexpr float SCALE_PLAYER_ANGLE = 30.0f;
 constexpr float SCALE_WALL = 10.0f;
 constexpr float SCALE_SPEED = 10.0f;
-constexpr float SCALE_SIZE_DIFF = 50.0f;
+constexpr float SCALE_SIZE_DIFF = 30.0f;
 constexpr float SCALE_OWN_FOOD = 20.0f;
 constexpr float SCALE_OWN_SIZE = 20.0f;
 

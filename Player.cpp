@@ -9,6 +9,11 @@
 #include <fstream>
 #include <sstream>
 #include "Settings.h"
+#include <vector>
+class Food;
+class Player;
+extern std::vector<Food*> get_nearby_food(float x, float y);
+extern std::vector<Player*> get_nearby_players(float x, float y);
 
 namespace {
     float leaky_relu(float x) { return x > 0.0f ? x : 0.01f * x; }
@@ -140,8 +145,8 @@ bool Player::collide(const Player& other) const {
     float r1 = (width + height) / 4.0f;
     float r2 = (other.width + other.height) / 4.0f;
     float threshold = 0.8f * (r1 + r2);
-    float dist = std::sqrt(dx * dx + dy * dy);
-    return dist < threshold;
+    float dist2 = dx * dx + dy * dy;
+    return dist2 < threshold * threshold;
 }
 
 bool Player::eatPlayer(Game& game, Player& other) {
@@ -162,26 +167,28 @@ bool Player::eatPlayer(Game& game, Player& other) {
 }
 
 bool Player::eatFood(Game& game) {
-    for (auto it = game.foods.begin(); it != game.foods.end(); ++it) {
-        Food* food = *it;
+    auto foods = get_nearby_food(x, y);
+    for (auto* food : foods) {
         float dx = x - food->x;
         float dy = y - food->y;
         float r1 = (width + height) / 4.0f;
         float r2 = (food->width + food->height) / 4.0f;
         float threshold = 0.8f * (r1 + r2);
-        float dist = std::sqrt(dx * dx + dy * dy);
-        if (dist < threshold) {
+        float dist2 = dx * dx + dy * dy;
+        if (dist2 < threshold * threshold) {
             foodCount++;
             foodScore++;
             killTime = 0;
             width += FOOD_APPEND;
             height += FOOD_APPEND;
-            // Clamp size
             if (width > MAX_PLAYER_SIZE) width = MAX_PLAYER_SIZE;
             if (height > MAX_PLAYER_SIZE) height = MAX_PLAYER_SIZE;
-            delete food;
-            game.foods.erase(it);
-            game.randomFood(1); // Replenish food
+            auto it = std::find(game.foods.begin(), game.foods.end(), food);
+            if (it != game.foods.end()) {
+                delete food;
+                game.foods.erase(it);
+                game.randomFood(1);
+            }
             return true;
         }
     }
@@ -319,10 +326,10 @@ void Player::apply_nn_output(const std::array<float, NN_OUTPUTS>& nn_output) {
 }
 
 void Player::clamp_to_screen(const Game& game) {
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if (x > game.width - width) x = game.width - width;
-    if (y > game.height - height) y = game.height - height;
+    if (x < width / 2.0f) x = width / 2.0f;
+    if (y < height / 2.0f) y = height / 2.0f;
+    if (x > game.width - width / 2.0f) x = game.width - width / 2.0f;
+    if (y > game.height - height / 2.0f) y = game.height - height / 2.0f;
 }
 
 void Player::update(Game& game) {
@@ -339,7 +346,6 @@ void Player::update(Game& game) {
         }
     }
     if (!alive) return;
-    // Mitosis logic
     if (MITOSIS > 0 && foodCount >= 2 && rand() % MITOSIS == 0) {
         int new_width = std::max(1, width / 2);
         int new_height = std::max(1, height / 2);
@@ -354,7 +360,6 @@ void Player::update(Game& game) {
         alive = false;
         return;
     }
-    // Neural net movement
     NNInputsResult nn_result = get_nn_inputs(game);
     auto nn_output = predict(nn_result.inputs);
     apply_nn_output(nn_output);
@@ -365,23 +370,19 @@ void Player::update(Game& game) {
     distance_traveled += std::sqrt((x - old_x) * (x - old_x) + (y - old_y) * (y - old_y));
     clamp_to_screen(game);
     eatFood(game);
-    for (auto* other : game.players) {
+    auto nearby_players = get_nearby_players(x, y);
+    for (auto* other : nearby_players) {
         if (other->alive && other != this) {
             eatPlayer(game, *other);
         }
     }
-    // Store last state for NN input
     last_angle = angle;
     last_speed = speed;
-    // After movement, update last relative angles for next frame using dx/dy from NNInputsResult
-    // (call get_nn_inputs and use its dx/dy values)
-    // Food
     float to_food_angle = std::atan2(last_nn_food_dy, last_nn_food_dx);
     float rel_food_angle = to_food_angle - angle;
     while (rel_food_angle < -M_PI) rel_food_angle += 2*M_PI;
     while (rel_food_angle > M_PI) rel_food_angle -= 2*M_PI;
     last_rel_food_angle = rel_food_angle;
-    // Player
     float to_player_angle = std::atan2(last_nn_player_dy, last_nn_player_dx);
     float rel_player_angle = to_player_angle - angle;
     while (rel_player_angle < -M_PI) rel_player_angle += 2*M_PI;
@@ -390,12 +391,12 @@ void Player::update(Game& game) {
 }
 
 void Player::draw(SDL_Renderer* renderer) {
-    SDL_Rect rect = {static_cast<int>(x), static_cast<int>(y), width, height};
+    SDL_Rect rect = {static_cast<int>(x - width / 2.0f), static_cast<int>(y - height / 2.0f), width, height};
     SDL_SetRenderDrawColor(renderer, color[0], color[1], color[2], 255);
     SDL_RenderFillRect(renderer, &rect);
     // Draw direction arrow (half as long, with arrowhead)
-    float cx = x + width / 2.0f;
-    float cy = y + height / 2.0f;
+    float cx = x;
+    float cy = y;
     float len = (10.0f + 10.0f * (speed / MAX_SPEED)) * 0.5f;
     float ex = cx + std::cos(angle) * len;
     float ey = cy + std::sin(angle) * len;

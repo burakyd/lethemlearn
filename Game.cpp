@@ -6,11 +6,74 @@
 #include <cstdlib>
 #include <algorithm>
 #include <ctime>
+#include <unordered_map>
+#include <vector>
+#include <utility>
 
 #define MIN_FOOD_FOR_REPRO 2
 #define MIN_LIFETIME_FOR_REPRO 2000
 
 int game_time_units = 0;
+
+// Add grid cell size for partitioning
+constexpr int GRID_SIZE = 64;
+using GridCell = std::vector<Player*>;
+using FoodCell = std::vector<Food*>;
+
+// Helper to get grid cell index
+inline std::pair<int, int> get_cell(float x, float y) {
+    return {static_cast<int>(x) / GRID_SIZE, static_cast<int>(y) / GRID_SIZE};
+}
+
+// Add grid structures to Game
+std::unordered_map<long long, GridCell> player_grid;
+std::unordered_map<long long, FoodCell> food_grid;
+
+// Helper to get a unique key for a cell
+inline long long cell_key(int cx, int cy) { return (static_cast<long long>(cx) << 32) | (cy & 0xffffffff); }
+
+// Update grid each frame
+void update_grids(Game& game) {
+    player_grid.clear();
+    food_grid.clear();
+    for (auto* p : game.players) {
+        if (!p->alive) continue;
+        auto [cx, cy] = get_cell(p->x, p->y);
+        player_grid[cell_key(cx, cy)].push_back(p);
+    }
+    for (auto* f : game.foods) {
+        auto [cx, cy] = get_cell(f->x, f->y);
+        food_grid[cell_key(cx, cy)].push_back(f);
+    }
+}
+
+// Helper to get all players/food in neighboring cells
+std::vector<Player*> get_nearby_players(float x, float y) {
+    std::vector<Player*> result;
+    auto [cx, cy] = get_cell(x, y);
+    for (int dx = -1; dx <= 1; ++dx) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            long long key = cell_key(cx + dx, cy + dy);
+            if (player_grid.count(key)) {
+                result.insert(result.end(), player_grid[key].begin(), player_grid[key].end());
+            }
+        }
+    }
+    return result;
+}
+std::vector<Food*> get_nearby_food(float x, float y) {
+    std::vector<Food*> result;
+    auto [cx, cy] = get_cell(x, y);
+    for (int dx = -1; dx <= 1; ++dx) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            long long key = cell_key(cx + dx, cy + dy);
+            if (food_grid.count(key)) {
+                result.insert(result.end(), food_grid[key].begin(), food_grid[key].end());
+            }
+        }
+    }
+    return result;
+}
 
 Game::Game(SDL_Renderer* renderer) : renderer(renderer) {
     // Initialize game state, spawn initial players/food as needed
@@ -18,7 +81,7 @@ Game::Game(SDL_Renderer* renderer) : renderer(renderer) {
 
 void Game::update() {
     game_time_units++;
-    // Update all players, hunters, and food
+    update_grids(*this);
     for (auto* p : players) if (p) p->update(*this);
     for (auto* h : hunters) if (h) h->update(*this);
     for (auto* f : foods) if (f) f->update(*this);
