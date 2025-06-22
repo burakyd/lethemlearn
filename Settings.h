@@ -66,7 +66,19 @@ constexpr std::array<std::tuple<int, int>, 4> NEURAL_NET_SHAPE = {
     std::make_tuple(NN_H3, NN_OUTPUTS)
 };
 
+// This is done after normalization to [-1,1], so the players are more sensitive to environmental changes
+// Can be individually changed to increase/decrease the effect of a feature
+constexpr float SCALE_FOOD_DIST = 30.0f;
+constexpr float SCALE_FOOD_ANGLE = 30.0f;
+constexpr float SCALE_PLAYER_DIST = 50.0f;
+constexpr float SCALE_PLAYER_ANGLE = 50.0f;
+constexpr float SCALE_WALL = 10.0f;
+constexpr float SCALE_SPEED = 10.0f;
+constexpr float SCALE_SIZE_DIFF = 50.0f;
+
 // Smoothing factor for temporal smoothing of NN inputs
+// 0 means no change in inputs, 1 means instant change
+// Helps with more natural behavior, especially for rapid changes in the inputs
 constexpr float NN_INPUT_SMOOTHING_ALPHA = 0.2f;
 
 // Gene Saving

@@ -16,16 +16,6 @@ namespace {
     int toWASD(float v) { return v > 0.5f ? 1 : 0; }
 }
 
-// This is done so the players are more sensitive to environmental changes
-// Can be individually changed to increase/decrease the effect of a feature
-constexpr float SCALE_FOOD_DIST = 50.0f;
-constexpr float SCALE_FOOD_ANGLE = 50.0f;
-constexpr float SCALE_PLAYER_DIST = 30.0f;
-constexpr float SCALE_PLAYER_ANGLE = 30.0f;
-constexpr float SCALE_WALL = 10.0f;
-constexpr float SCALE_SPEED = 10.0f;
-constexpr float SCALE_SIZE_DIFF = 30.0f;
-
 Player::Player(int width, int height, std::array<int, 3> color, float x, float y, bool alive)
     : width(width), height(height), color(color), x(x), y(y), alive(alive), foodCount(0), lifeTime(0), killTime(0), foodScore(0), playerEaten(0), parent_id(-1)
 {
@@ -264,6 +254,8 @@ NNInputsResult Player::get_nn_inputs(const Game& game) {
     size_diff *= SCALE_SIZE_DIFF; // scale for NN
 
     // Temporal smoothing (low-pass filter)
+    // Used to decrease the effect of rapid changes in inputs to the outputs
+    // Can be adjusted by alpha
     float alpha = NN_INPUT_SMOOTHING_ALPHA;
     this->smoothed_food_dist = alpha * food_dist_scaled + (1 - alpha) * this->smoothed_food_dist;
     this->smoothed_food_angle = alpha * rel_food_angle_scaled + (1 - alpha) * this->smoothed_food_angle;
