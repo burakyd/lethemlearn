@@ -55,7 +55,7 @@ constexpr int NUMBER_OF_MUTATES = 3;
 // Don't change the input and output layers, unless it is for a logic change.
 constexpr int NN_INPUTS = 12;
 constexpr int NN_H1 = 12;
-constexpr int NN_H2 = 24;
+constexpr int NN_H2 = 12;
 constexpr int NN_H3 = 12;
 constexpr int NN_OUTPUTS = 2;
 
@@ -75,9 +75,11 @@ constexpr float SCALE_PLAYER_ANGLE = 50.0f;
 constexpr float SCALE_WALL = 10.0f;
 constexpr float SCALE_SPEED = 10.0f;
 constexpr float SCALE_SIZE_DIFF = 50.0f;
+constexpr float SCALE_OWN_FOOD = 20.0f;
+constexpr float SCALE_OWN_SIZE = 20.0f;
 
 // Smoothing factor for temporal smoothing of NN inputs
-// 0 means no change in inputs, 1 means instant change
+// 0 means no change in inputs, 1 means instant change to the new value
 // Helps with more natural behavior, especially for rapid changes in the inputs
 constexpr float NN_INPUT_SMOOTHING_ALPHA = 0.2f;
 

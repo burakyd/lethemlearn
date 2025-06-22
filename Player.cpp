@@ -251,7 +251,9 @@ NNInputsResult Player::get_nn_inputs(const Game& game) {
     top_wall *= SCALE_WALL;
     bottom_wall *= SCALE_WALL;
     speed_scaled *= SCALE_SPEED;
-    size_diff *= SCALE_SIZE_DIFF; // scale for NN
+    size_diff *= SCALE_SIZE_DIFF;
+    own_norm_size *= SCALE_OWN_SIZE;
+    own_food_count *= SCALE_OWN_FOOD;
 
     // Temporal smoothing (low-pass filter)
     // Used to decrease the effect of rapid changes in inputs to the outputs
