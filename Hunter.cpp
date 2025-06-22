@@ -95,7 +95,7 @@ void Hunter::update(Game& game) {
 }
 
 void Hunter::draw(SDL_Renderer* renderer) {
-    SDL_Rect rect = {static_cast<int>(x), static_cast<int>(y), width, height};
+    SDL_Rect rect = {static_cast<int>(x - width / 2.0f), static_cast<int>(y - height / 2.0f), width, height};
     SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red
     SDL_RenderFillRect(renderer, &rect);
 }

@@ -135,9 +135,13 @@ std::vector<std::vector<float>> Player::mitosis(bool mutate) {
 }
 
 bool Player::collide(const Player& other) const {
-    float leftA = x, rightA = x + width, topA = y, bottomA = y + height;
-    float leftB = other.x, rightB = other.x + other.width, topB = other.y, bottomB = other.y + other.height;
-    return !(leftA >= rightB || rightA <= leftB || topA >= bottomB || bottomA <= topB);
+    float dx = x - other.x;
+    float dy = y - other.y;
+    float r1 = (width + height) / 4.0f;
+    float r2 = (other.width + other.height) / 4.0f;
+    float threshold = 0.8f * (r1 + r2);
+    float dist = std::sqrt(dx * dx + dy * dy);
+    return dist < threshold;
 }
 
 bool Player::eatPlayer(Game& game, Player& other) {
@@ -160,9 +164,13 @@ bool Player::eatPlayer(Game& game, Player& other) {
 bool Player::eatFood(Game& game) {
     for (auto it = game.foods.begin(); it != game.foods.end(); ++it) {
         Food* food = *it;
-        float leftA = x, rightA = x + width, topA = y, bottomA = y + height;
-        float leftB = food->x, rightB = food->x + food->width, topB = food->y, bottomB = food->y + food->height;
-        if (!(leftA >= rightB || rightA <= leftB || topA >= bottomB || bottomA <= topB)) {
+        float dx = x - food->x;
+        float dy = y - food->y;
+        float r1 = (width + height) / 4.0f;
+        float r2 = (food->width + food->height) / 4.0f;
+        float threshold = 0.8f * (r1 + r2);
+        float dist = std::sqrt(dx * dx + dy * dy);
+        if (dist < threshold) {
             foodCount++;
             foodScore++;
             killTime = 0;

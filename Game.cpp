@@ -52,12 +52,15 @@ void Game::newPlayer(int number, int width, int height, std::array<int, 3> color
         if (random_color) {
             color = {rand() % 256, rand() % 256, rand() % 256};
         }
-        float x = rand() % (this->width - DOT_WIDTH);
-        float y = rand() % (this->height - DOT_HEIGHT);
+        float x = (rand() % (this->width - width)) + width / 2.0f;
+        float y = (rand() % (this->height - height)) + height / 2.0f;
         // Check collision with existing players
         bool valid = true;
         for (auto* player : players) {
-            if (inLocation(x, y, DOT_WIDTH, DOT_HEIGHT, player->x, player->y, player->width, player->height)) {
+            float dx = x - player->x;
+            float dy = y - player->y;
+            float min_dist = (width + player->width) / 2.0f;
+            if (std::sqrt(dx * dx + dy * dy) < min_dist) {
                 valid = false;
                 break;
             }
@@ -65,18 +68,20 @@ void Game::newPlayer(int number, int width, int height, std::array<int, 3> color
         if (!valid) { --i; continue; }
         // Check collision with food
         for (auto* food : foods) {
-            if (inLocation(x, y, DOT_WIDTH, DOT_HEIGHT, food->x, food->y, food->width, food->height)) {
+            float dx = x - food->x;
+            float dy = y - food->y;
+            float min_dist = (width + food->width) / 2.0f;
+            if (std::sqrt(dx * dx + dy * dy) < min_dist) {
                 valid = false;
                 break;
             }
         }
         if (!valid) { --i; continue; }
-        // Use gene pool if available
         if (!Player::gene_pool.empty()) {
             auto entry = Player::sample_gene_from_pool();
-            players.push_back(new Player(entry.genes, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(x), static_cast<float>(y)));
+            players.push_back(new Player(entry.genes, width, height, color, x, y));
         } else {
-            players.push_back(new Player(DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(x), static_cast<float>(y)));
+            players.push_back(new Player(width, height, color, x, y));
         }
     }
 }
@@ -86,20 +91,24 @@ void Game::newHunter(int number, int width, int height, std::array<int, 3> color
         if (random_color) {
             color = {rand() % 256, rand() % 256, rand() % 256};
         }
-        float x = rand() % (this->width - width);
-        float y = rand() % (this->height - height);
-        // Check collision with existing players
+        float x = (rand() % (this->width - width)) + width / 2.0f;
+        float y = (rand() % (this->height - height)) + height / 2.0f;
         bool valid = true;
         for (auto* player : players) {
-            if (inLocation(x, y, width, height, player->x, player->y, player->width, player->height)) {
+            float dx = x - player->x;
+            float dy = y - player->y;
+            float min_dist = (width + player->width) / 2.0f;
+            if (std::sqrt(dx * dx + dy * dy) < min_dist) {
                 valid = false;
                 break;
             }
         }
         if (!valid) { --i; continue; }
-        // Check collision with food
         for (auto* food : foods) {
-            if (inLocation(x, y, width, height, food->x, food->y, food->width, food->height)) {
+            float dx = x - food->x;
+            float dy = y - food->y;
+            float min_dist = (width + food->width) / 2.0f;
+            if (std::sqrt(dx * dx + dy * dy) < min_dist) {
                 valid = false;
                 break;
             }
@@ -118,20 +127,24 @@ void Game::newHunter(int number, int width, int height, std::array<int, 3> color
 void Game::randomFood(int num) {
     for (int i = 0; i < num; ++i) {
         int width = FOOD_WIDTH, height = FOOD_HEIGHT;
-        float x = rand() % (this->width - width);
-        float y = rand() % (this->height - height);
-        // Check collision with players
+        float x = (rand() % (this->width - width)) + width / 2.0f;
+        float y = (rand() % (this->height - height)) + height / 2.0f;
         bool valid = true;
         for (auto* player : players) {
-            if (inLocation(x, y, width, height, player->x, player->y, player->width, player->height)) {
+            float dx = x - player->x;
+            float dy = y - player->y;
+            float min_dist = (width + player->width) / 2.0f;
+            if (std::sqrt(dx * dx + dy * dy) < min_dist) {
                 valid = false;
                 break;
             }
         }
         if (!valid) { --i; continue; }
-        // Check collision with food
         for (auto* food : foods) {
-            if (inLocation(x, y, width, height, food->x, food->y, food->width, food->height)) {
+            float dx = x - food->x;
+            float dy = y - food->y;
+            float min_dist = (width + food->width) / 2.0f;
+            if (std::sqrt(dx * dx + dy * dy) < min_dist) {
                 valid = false;
                 break;
             }

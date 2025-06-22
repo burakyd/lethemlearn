@@ -9,7 +9,7 @@ void Food::update(Game& game) {
 }
 
 void Food::draw(SDL_Renderer* renderer) {
-    SDL_Rect rect = {static_cast<int>(x), static_cast<int>(y), width, height};
+    SDL_Rect rect = {static_cast<int>(x - width / 2.0f), static_cast<int>(y - height / 2.0f), width, height};
     SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green
     SDL_RenderFillRect(renderer, &rect);
 } 
