@@ -10,6 +10,7 @@
 #include <sstream>
 #include "Settings.h"
 #include <vector>
+#include <SDL.h>
 class Food;
 class Player;
 extern std::vector<Food*> get_nearby_food(float x, float y);
@@ -144,7 +145,7 @@ bool Player::collide(const Player& other) const {
     float dy = y - other.y;
     float r1 = (width + height) / 4.0f;
     float r2 = (other.width + other.height) / 4.0f;
-    float threshold = 0.8f * (r1 + r2);
+    float threshold = 0.9f * (r1 + r2);
     float dist2 = dx * dx + dy * dy;
     return dist2 < threshold * threshold;
 }
@@ -173,7 +174,7 @@ bool Player::eatFood(Game& game) {
         float dy = y - food->y;
         float r1 = (width + height) / 4.0f;
         float r2 = (food->width + food->height) / 4.0f;
-        float threshold = 0.8f * (r1 + r2);
+        float threshold = 0.9f * (r1 + r2);
         float dist2 = dx * dx + dy * dy;
         if (dist2 < threshold * threshold) {
             foodCount++;
@@ -466,6 +467,10 @@ float Player::get_random_input() const {
 std::vector<Player::GeneEntry> Player::gene_pool;
 
 void Player::try_insert_gene_to_pool(float fitness, const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases) {
+    // Prevent human players from being added to the gene pool
+    // This function is static, so we can't check an instance, but the call site is now protected.
+    // Defensive: if genes or biases are empty, do nothing (could indicate human or error)
+    if (genes.empty() || biases.empty()) return;
     // Insert if pool not full or fitness is better than the worst
     if (gene_pool.size() < GENE_POOL_SIZE) {
         gene_pool.push_back({fitness, genes, biases});
@@ -541,4 +546,62 @@ Player::GeneEntry Player::sample_gene_from_pool() {
     if (gene_pool.empty()) throw std::runtime_error("Gene pool is empty");
     int idx = rand() % gene_pool.size();
     return gene_pool[idx];
+}
+
+HumanPlayer::HumanPlayer(int width, int height, std::array<int, 3> color, float x, float y, bool alive)
+    : Player(width, height, color, x, y, alive)
+{
+    is_human = true;
+}
+
+void HumanPlayer::update(Game& game) {
+    lifeTime++;
+    killTime++;
+    if (killTime >= KILL_TIME) {
+        killTime = 0;
+        if (foodCount > 0) {
+            foodCount--;
+            width = std::max(1, width - 2);
+            height = std::max(1, height - 2);
+        } else if (KILL) {
+            alive = false;
+        }
+    }
+    if (!alive) return;
+    int mouse_x, mouse_y;
+    SDL_GetMouseState(&mouse_x, &mouse_y);
+    float dx = mouse_x - x;
+    float dy = mouse_y - y;
+    float dist = std::sqrt(dx * dx + dy * dy);
+    float size_factor = float(DOT_WIDTH) / float(width);
+    float min_speed_factor = 0.3f; // Minimum 30% of MAX_SPEED
+    size_factor = std::max(size_factor, min_speed_factor);
+    float effective_max_speed = MAX_SPEED * size_factor;
+    float move_speed = effective_max_speed * (1.0f - std::exp(-dist / 50.0f));
+    float move_x = 0.0f, move_y = 0.0f;
+    if (dist > 1.0f) { // Only move if not very close
+        move_x = (dx / dist) * move_speed;
+        move_y = (dy / dist) * move_speed;
+        // Clamp movement if closer than move_speed
+        if (dist < move_speed) {
+            move_x = dx;
+            move_y = dy;
+        }
+        x += move_x;
+        y += move_y;
+        angle = std::atan2(move_y, move_x);
+        speed = move_speed;
+    } else {
+        speed = 0.0f;
+    }
+    clamp_to_screen(game);
+    eatFood(game);
+    auto nearby_players = get_nearby_players(x, y);
+    for (auto* other : nearby_players) {
+        if (other->alive && other != this) {
+            eatPlayer(game, *other);
+        }
+    }
+    last_angle = angle;
+    last_speed = speed;
 } 

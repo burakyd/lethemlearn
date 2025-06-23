@@ -77,10 +77,16 @@ public:
     static void save_gene_pool(const std::string& filename = "gene_pool.txt");
     static void load_gene_pool(const std::string& filename = "gene_pool.txt");
     static GeneEntry sample_gene_from_pool();
-private:
+    bool is_human = false;
     void clamp_to_screen(const Game& game);
 };
 
 // Helper functions for gene crossover and mutation
 std::vector<std::vector<float>> crossover(const std::vector<std::vector<float>>&, const std::vector<std::vector<float>>&);
-void mutate_genes(std::vector<std::vector<float>>&, int nMutate = NUMBER_OF_MUTATES); 
+void mutate_genes(std::vector<std::vector<float>>&, int nMutate = NUMBER_OF_MUTATES);
+
+class HumanPlayer : public Player {
+public:
+    HumanPlayer(int width = DOT_WIDTH, int height = DOT_HEIGHT, std::array<int, 3> color = DOT_COLOR, float x = 0, float y = 0, bool alive = true);
+    void update(Game& game) override;
+}; 

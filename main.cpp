@@ -10,6 +10,7 @@
 #include "Food.h"
 #include <fstream>
 #include <map>
+#include "Settings.h"
 
 // Helper to render text
 void renderText(SDL_Renderer* renderer, TTF_Font* font, const std::string& text, int x, int y, SDL_Color color) {
@@ -26,12 +27,14 @@ int g_bot_count = MIN_BOT;
 int g_food_count = NUMBER_OF_FOODS;
 bool g_hunters_enabled = true;
 int g_hunter_count = HUNTERS;
+bool g_player_enabled = PLAYER_ENABLED;
 
 // Add pending settings variables at the top (after global settings):
 int pending_bot_count = g_bot_count;
 int pending_food_count = g_food_count;
 bool pending_hunters_enabled = g_hunters_enabled;
 int pending_hunter_count = g_hunter_count;
+bool pending_player_enabled = g_player_enabled;
 
 // Add button definitions after global variables:
 struct SidebarButton {
@@ -61,24 +64,28 @@ void restart_simulation(Game& game, SDL_Renderer* renderer, const std::vector<st
     game.foods.clear();
     // Ensure at least MIN_BOT bots
     g_bot_count = std::max(g_bot_count, MIN_BOT);
+    int bots_to_spawn = g_bot_count;
+    if (g_player_enabled) {
+        // Add human player at center
+        game.players.push_back(new HumanPlayer(DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SCREEN_WIDTH/2, SCREEN_HEIGHT/2));
+        bots_to_spawn -= 1;
+    }
     if (loaded_genes && !loaded_genes->empty()) {
-        // Use loaded genes for initial bots
         int used = 0;
         for (const auto& genes : *loaded_genes) {
+            if (bots_to_spawn <= 0) break;
             game.players.push_back(new Player(genes, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
             used++;
-            if (used >= g_bot_count) break;
+            bots_to_spawn--;
         }
-        // Fill the rest randomly
-        if (used < g_bot_count)
-            game.newPlayer(g_bot_count - used, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SPEED, true, true);
+        if (used < bots_to_spawn)
+            game.newPlayer(bots_to_spawn - used, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SPEED, true, true);
     } else if (best_gene && !best_gene->empty()) {
-        // Use best gene for all bots
-        for (int i = 0; i < g_bot_count; ++i) {
+        for (int i = 0; i < bots_to_spawn; ++i) {
             game.players.push_back(new Player(*best_gene, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
         }
     } else {
-        game.newPlayer(g_bot_count, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SPEED, true, true);
+        game.newPlayer(bots_to_spawn, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SPEED, true, true);
     }
     if (g_hunters_enabled) {
         game.newHunter(g_hunter_count, HUNTER_WIDTH, HUNTER_HEIGHT, HUNTER_COLOR, SPEED, false, false);
@@ -152,6 +159,7 @@ int main(int argc, char* argv[]) {
                         g_food_count = pending_food_count;
                         g_hunters_enabled = pending_hunters_enabled;
                         g_hunter_count = pending_hunter_count;
+                        g_player_enabled = pending_player_enabled;
                         restart_simulation(game, renderer);
                         show_settings = false;
                         paused = false;
@@ -160,33 +168,6 @@ int main(int argc, char* argv[]) {
                         show_menu = paused;
                         show_settings = false;
                     }
-                } else if (e.key.keysym.sym == SDLK_s) {
-                    if (!show_settings) {
-                        // Entering settings: copy current to pending
-                        pending_bot_count = g_bot_count;
-                        pending_food_count = g_food_count;
-                        pending_hunters_enabled = g_hunters_enabled;
-                        pending_hunter_count = g_hunter_count;
-                        show_settings = true;
-                        paused = true;
-                    } else {
-                        // Exiting settings: apply and restart
-                        g_bot_count = pending_bot_count;
-                        g_food_count = pending_food_count;
-                        g_hunters_enabled = pending_hunters_enabled;
-                        g_hunter_count = pending_hunter_count;
-                        restart_simulation(game, renderer);
-                        show_settings = false;
-                        paused = false;
-                    }
-                } else if (show_settings) {
-                    if (e.key.keysym.sym == SDLK_b) pending_bot_count = std::min(200, pending_bot_count + 1);
-                    if (e.key.keysym.sym == SDLK_n) pending_bot_count = std::max(1, pending_bot_count - 1);
-                    if (e.key.keysym.sym == SDLK_f) pending_food_count = std::min(100, pending_food_count + 1);
-                    if (e.key.keysym.sym == SDLK_g) pending_food_count = std::max(1, pending_food_count - 1);
-                    if (e.key.keysym.sym == SDLK_h) pending_hunters_enabled = !pending_hunters_enabled;
-                    if (e.key.keysym.sym == SDLK_j) pending_hunter_count = std::min(50, pending_hunter_count + 1);
-                    if (e.key.keysym.sym == SDLK_k) pending_hunter_count = std::max(0, pending_hunter_count - 1);
                 } else if (e.key.keysym.sym == SDLK_r) {
                     restart_simulation(game, renderer);
                 } else if (e.key.keysym.sym == SDLK_UP && !show_settings) {
@@ -219,6 +200,7 @@ int main(int argc, char* argv[]) {
                         pending_food_count = g_food_count;
                         pending_hunters_enabled = g_hunters_enabled;
                         pending_hunter_count = g_hunter_count;
+                        pending_player_enabled = g_player_enabled;
                         show_settings = true;
                         paused = true;
                     } else {
@@ -226,6 +208,7 @@ int main(int argc, char* argv[]) {
                         g_food_count = pending_food_count;
                         g_hunters_enabled = pending_hunters_enabled;
                         g_hunter_count = pending_hunter_count;
+                        g_player_enabled = pending_player_enabled;
                         restart_simulation(game, renderer);
                         show_settings = false;
                         paused = false;
@@ -480,9 +463,10 @@ int main(int argc, char* argv[]) {
             renderText(renderer, font, "F/G: Food +/-", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, std::to_string(pending_food_count), SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
             renderText(renderer, font, "H: Toggle Hunters", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, pending_hunters_enabled ? "[X]" : "[ ]", SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
             renderText(renderer, font, "J/K: Hunters +/-", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, std::to_string(pending_hunter_count), SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
+            renderText(renderer, font, "P: Toggle Human Player", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, pending_player_enabled ? "[X]" : "[ ]", SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
             std::string speed_str = (sim_speed == -2) ? "LOGIC MAX" : (sim_speed == -1) ? "MAX" : (std::to_string(sim_speed) + "x");
             renderText(renderer, font, "Speed (UP/DOWN):", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, speed_str, SCREEN_WIDTH/2 + 100, sy, cyan); sy += 32;
-            renderText(renderer, font, "S or ESC: Apply & Close", SCREEN_WIDTH/2 - 80, sy + 32, cyan);
+            renderText(renderer, font, "ESC: Apply & Close", SCREEN_WIDTH/2 - 80, sy + 32, cyan);
         }
         if (paused && show_menu && !show_settings) {
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
@@ -491,7 +475,6 @@ int main(int argc, char* argv[]) {
             renderText(renderer, font, "C++ Evolution Simulation", SCREEN_WIDTH/2 - 120, SCREEN_HEIGHT/2 - 100, green);
             renderText(renderer, font, "Press SPACE to Start", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 - 60, white);
             renderText(renderer, font, "ESC: Pause/Resume", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 - 30, white);
-            renderText(renderer, font, "S: Settings", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2, white);
             renderText(renderer, font, "R: Restart", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 + 30, white);
             renderText(renderer, font, "UP/DOWN: Speed", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 + 60, white);
             renderText(renderer, font, "Close window to exit", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 + 90, white);

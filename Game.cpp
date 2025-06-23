@@ -225,8 +225,10 @@ void Game::maintain_population() {
         for (auto* h : hunters) if (h == p) is_hunter = true;
         if (!p->alive && !is_hunter) {
             // Insert genes into pool before deleting
-            float fit = float(p->foodScore) * float(p->lifeTime) + p->distance_traveled;
-            Player::try_insert_gene_to_pool(fit, p->genes, p->biases);
+            if (!p->is_human) {
+                float fit = float(p->foodScore) * float(p->lifeTime) + p->distance_traveled;
+                Player::try_insert_gene_to_pool(fit, p->genes, p->biases);
+            }
             delete p;
             it = players.erase(it);
         } else {
@@ -242,7 +244,10 @@ void Game::maintain_population() {
     }
     // Elitism: keep best agent unchanged, but only if it is truly best
     const int N_ELITES = 3;
-    std::vector<Player*> sorted_alive = alive_bots;
+    std::vector<Player*> sorted_alive;
+    for (auto* p : alive_bots) {
+        if (!p->is_human) sorted_alive.push_back(p);
+    }
     std::sort(sorted_alive.begin(), sorted_alive.end(), [](Player* a, Player* b) {
         // Wall penalty
         float wall_penalty_a = 0.0f;

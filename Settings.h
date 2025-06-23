@@ -22,7 +22,7 @@ constexpr int RANDOM_SIZE_MIN = 5;
 constexpr int RANDOM_SIZE_MAX = 15;
 constexpr std::array<int, 3> DOT_COLOR = GREEN;
 constexpr float MAX_SPEED = 2.0f; // max speed of the players
-constexpr int MAX_PLAYER_SIZE = 6 * DOT_WIDTH; // max player size
+constexpr int MAX_PLAYER_SIZE = 10 * DOT_WIDTH; // max player size
 
 // Food Settings
 constexpr int FOOD_WIDTH = 5;
