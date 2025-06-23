@@ -149,35 +149,72 @@ int main(int argc, char* argv[]) {
                 quit = true;
             }
             if (e.type == SDL_KEYDOWN) {
-                if (show_menu && e.key.keysym.sym == SDLK_SPACE) {
-                    show_menu = false;
-                    paused = false;
-                } else if (e.key.keysym.sym == SDLK_ESCAPE) {
-                    if (show_settings) {
-                        // Apply pending settings and restart
-                        g_bot_count = pending_bot_count;
-                        g_food_count = pending_food_count;
-                        g_hunters_enabled = pending_hunters_enabled;
-                        g_hunter_count = pending_hunter_count;
-                        g_player_enabled = pending_player_enabled;
-                        restart_simulation(game, renderer);
-                        show_settings = false;
-                        paused = false;
-                    } else {
-                        paused = !paused;
-                        show_menu = paused;
-                        show_settings = false;
+                if (paused) {
+                    // Settings adjustment keys
+                    switch (e.key.keysym.sym) {
+                        case SDLK_b:
+                            pending_bot_count = std::max(1, pending_bot_count - 1);
+                            break;
+                        case SDLK_n:
+                            pending_bot_count = std::min(200, pending_bot_count + 1);
+                            break;
+                        case SDLK_f:
+                            pending_food_count = std::max(1, pending_food_count - 1);
+                            break;
+                        case SDLK_g:
+                            pending_food_count = std::min(200, pending_food_count + 1);
+                            break;
+                        case SDLK_h:
+                            pending_hunters_enabled = !pending_hunters_enabled;
+                            break;
+                        case SDLK_j:
+                            pending_hunter_count = std::max(0, pending_hunter_count - 1);
+                            break;
+                        case SDLK_k:
+                            pending_hunter_count = std::min(50, pending_hunter_count + 1);
+                            break;
+                        case SDLK_p:
+                            pending_player_enabled = !pending_player_enabled;
+                            break;
+                        case SDLK_ESCAPE:
+                            // Apply pending settings and restart
+                            g_bot_count = pending_bot_count;
+                            g_food_count = pending_food_count;
+                            g_hunters_enabled = pending_hunters_enabled;
+                            g_hunter_count = pending_hunter_count;
+                            g_player_enabled = pending_player_enabled;
+                            restart_simulation(game, renderer);
+                            paused = false;
+                            break;
+                        case SDLK_r:
+                            restart_simulation(game, renderer);
+                            break;
+                        case SDLK_UP:
+                            speed_index = std::min((int)speed_steps.size() - 1, speed_index + 1);
+                            sim_speed = speed_steps[speed_index];
+                            logic_max_mode = (sim_speed == -2);
+                            break;
+                        case SDLK_DOWN:
+                            speed_index = std::max(0, speed_index - 1);
+                            sim_speed = speed_steps[speed_index];
+                            logic_max_mode = false;
+                            break;
                     }
-                } else if (e.key.keysym.sym == SDLK_r) {
-                    restart_simulation(game, renderer);
-                } else if (e.key.keysym.sym == SDLK_UP && !show_settings) {
-                    speed_index = std::min((int)speed_steps.size() - 1, speed_index + 1); // Allow LOGIC MAX
-                    sim_speed = speed_steps[speed_index];
-                    logic_max_mode = (sim_speed == -2);
-                } else if (e.key.keysym.sym == SDLK_DOWN && !show_settings) {
-                    speed_index = std::max(0, speed_index - 1);
-                    sim_speed = speed_steps[speed_index];
-                    logic_max_mode = false;
+                } else {
+                    // Normal (not paused) controls
+                    if (e.key.keysym.sym == SDLK_ESCAPE) {
+                        paused = true;
+                    } else if (e.key.keysym.sym == SDLK_r) {
+                        restart_simulation(game, renderer);
+                    } else if (e.key.keysym.sym == SDLK_UP) {
+                        speed_index = std::min((int)speed_steps.size() - 1, speed_index + 1);
+                        sim_speed = speed_steps[speed_index];
+                        logic_max_mode = (sim_speed == -2);
+                    } else if (e.key.keysym.sym == SDLK_DOWN) {
+                        speed_index = std::max(0, speed_index - 1);
+                        sim_speed = speed_steps[speed_index];
+                        logic_max_mode = false;
+                    }
                 }
             }
             // Handle mouse events for sidebar buttons
@@ -193,26 +230,15 @@ int main(int argc, char* argv[]) {
             }
             if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && hovered_button != -1) {
                 std::string action = sidebar_buttons[hovered_button].action;
-                if (action == "pause") { paused = !paused; show_menu = paused; show_settings = false; }
+                if (action == "pause") { paused = !paused; }
                 else if (action == "settings") {
-                    if (!show_settings) {
-                        pending_bot_count = g_bot_count;
-                        pending_food_count = g_food_count;
-                        pending_hunters_enabled = g_hunters_enabled;
-                        pending_hunter_count = g_hunter_count;
-                        pending_player_enabled = g_player_enabled;
-                        show_settings = true;
-                        paused = true;
-                    } else {
-                        g_bot_count = pending_bot_count;
-                        g_food_count = pending_food_count;
-                        g_hunters_enabled = pending_hunters_enabled;
-                        g_hunter_count = pending_hunter_count;
-                        g_player_enabled = pending_player_enabled;
-                        restart_simulation(game, renderer);
-                        show_settings = false;
-                        paused = false;
-                    }
+                    paused = true;
+                    // Copy current settings to pending
+                    pending_bot_count = g_bot_count;
+                    pending_food_count = g_food_count;
+                    pending_hunters_enabled = g_hunters_enabled;
+                    pending_hunter_count = g_hunter_count;
+                    pending_player_enabled = g_player_enabled;
                 }
                 else if (action == "restart") restart_simulation(game, renderer);
                 else if (action == "speed_up") {
@@ -266,7 +292,7 @@ int main(int argc, char* argv[]) {
             float avg_score = alive_players > 0 ? float(sum_score) / alive_players : 0.0f;
             // Sidebar is now adaptive to screen size
             int sidebar_x = SCREEN_WIDTH + 20;
-            renderText(renderer, font, "--- STATS ---", sidebar_x, y, green); y += 35;
+            renderText(renderer, font, "     --- STATS ---", sidebar_x, y, green); y += 35;
             renderText(renderer, font, "Bots Alive: " + std::to_string(alive_players) + " / " + std::to_string(g_bot_count), sidebar_x, y, white); y += 28;
             renderText(renderer, font, "Hunters:   " + std::string(g_hunters_enabled ? "[X] " : "[ ] ") + std::to_string(total_hunters) + " / " + std::to_string(g_hunter_count), sidebar_x, y, white); y += 28;
             renderText(renderer, font, "Food:      " + std::to_string(total_food) + " / " + std::to_string(g_food_count), sidebar_x, y, white); y += 28;
@@ -312,8 +338,6 @@ int main(int argc, char* argv[]) {
                             logic_max_mode = false;
                         } else if (logic_event.key.keysym.sym == SDLK_ESCAPE) {
                             paused = !paused;
-                            show_menu = paused;
-                            show_settings = false;
                             logic_max_mode = false;
                         } else if (logic_event.key.keysym.sym == SDLK_q) {
                             quit = true;
@@ -392,7 +416,6 @@ int main(int argc, char* argv[]) {
             int btn_w = 48, btn_h = 32, gap = 12;
             int y = y_start;
             sidebar_buttons.push_back({{sidebar_x, y, 160, btn_h}, "Pause/Resume", "pause"}); y += btn_h + gap;
-            sidebar_buttons.push_back({{sidebar_x, y, 160, btn_h}, "Settings", "settings"}); y += btn_h + gap;
             sidebar_buttons.push_back({{sidebar_x, y, 160, btn_h}, "Restart", "restart"}); y += btn_h + gap;
             // Speed row: '-' [speed] '+'
             int speed_row_y = y;
@@ -424,7 +447,12 @@ int main(int argc, char* argv[]) {
             }
         }
         y += (int)sidebar_buttons.size() * (32 + 12) + 20;
-        renderText(renderer, font, "--- STATS ---", sidebar_x, y, green); y += 35;
+        // Centered STATS header in sidebar
+        int text_width = 0, text_height = 0;
+        TTF_SizeText(font, "--- STATS ---", &text_width, &text_height);
+        int sidebar_width = 200;
+        int centered_x = SCREEN_WIDTH + (sidebar_width - text_width) / 2;
+        renderText(renderer, font, "--- STATS ---", centered_x, y, green); y += 35;
         renderText(renderer, font, "Bots Alive: " + std::to_string(alive_players) + " / " + std::to_string(g_bot_count), sidebar_x, y, white); y += 28;
         renderText(renderer, font, "Hunters:   " + std::string(g_hunters_enabled ? "[X] " : "[ ] ") + std::to_string(total_hunters) + " / " + std::to_string(g_hunter_count), sidebar_x, y, white); y += 28;
         renderText(renderer, font, "Food:      " + std::to_string(total_food) + " / " + std::to_string(g_food_count), sidebar_x, y, white); y += 28;
@@ -452,13 +480,16 @@ int main(int argc, char* argv[]) {
         renderText(renderer, font, "game time: " + std::to_string(game_time_units/1000) + "(k)", sidebar_x, y, white); y += 28;
         std::string speed_str = (sim_speed == -2) ? "LOGIC MAX" : (sim_speed == -1) ? "MAX" : (std::to_string(sim_speed) + "x");
         renderText(renderer, font, "Speed: " + speed_str, sidebar_x, y, white); y += 28;
-        if (paused && show_settings) {
-            // Enhanced settings panel
+        if (paused) {
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 220);
-            SDL_Rect overlay = {SCREEN_WIDTH/2 - 220, SCREEN_HEIGHT/2 - 180, 440, 360};
+            SDL_Rect overlay = {SCREEN_WIDTH/2 - 220, SCREEN_HEIGHT/2 - 220, 440, 440};
             SDL_RenderFillRect(renderer, &overlay);
-            renderText(renderer, font, "--- SETTINGS ---", SCREEN_WIDTH/2 - 80, SCREEN_HEIGHT/2 - 160, green);
-            int sy = SCREEN_HEIGHT/2 - 120;
+            // Centered MENU & SETTINGS header
+            int menu_text_width = 0, menu_text_height = 0;
+            TTF_SizeText(font, "--- MENU & SETTINGS ---", &menu_text_width, &menu_text_height);
+            int menu_centered_x = SCREEN_WIDTH/2 - 220 + (440 - menu_text_width) / 2;
+            renderText(renderer, font, "--- MENU & SETTINGS ---", menu_centered_x, SCREEN_HEIGHT/2 - 200, green);
+            int sy = SCREEN_HEIGHT/2 - 160;
             renderText(renderer, font, "B/N: Bots +/-", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, std::to_string(pending_bot_count), SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
             renderText(renderer, font, "F/G: Food +/-", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, std::to_string(pending_food_count), SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
             renderText(renderer, font, "H: Toggle Hunters", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, pending_hunters_enabled ? "[X]" : "[ ]", SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
@@ -466,18 +497,8 @@ int main(int argc, char* argv[]) {
             renderText(renderer, font, "P: Toggle Human Player", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, pending_player_enabled ? "[X]" : "[ ]", SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
             std::string speed_str = (sim_speed == -2) ? "LOGIC MAX" : (sim_speed == -1) ? "MAX" : (std::to_string(sim_speed) + "x");
             renderText(renderer, font, "Speed (UP/DOWN):", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, speed_str, SCREEN_WIDTH/2 + 100, sy, cyan); sy += 32;
-            renderText(renderer, font, "ESC: Apply & Close", SCREEN_WIDTH/2 - 80, sy + 32, cyan);
-        }
-        if (paused && show_menu && !show_settings) {
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
-            SDL_Rect overlay = {SCREEN_WIDTH/2 - 200, SCREEN_HEIGHT/2 - 120, 400, 240};
-            SDL_RenderFillRect(renderer, &overlay);
-            renderText(renderer, font, "C++ Evolution Simulation", SCREEN_WIDTH/2 - 120, SCREEN_HEIGHT/2 - 100, green);
-            renderText(renderer, font, "Press SPACE to Start", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 - 60, white);
-            renderText(renderer, font, "ESC: Pause/Resume", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 - 30, white);
-            renderText(renderer, font, "R: Restart", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 + 30, white);
-            renderText(renderer, font, "UP/DOWN: Speed", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 + 60, white);
-            renderText(renderer, font, "Close window to exit", SCREEN_WIDTH/2 - 90, SCREEN_HEIGHT/2 + 90, white);
+            renderText(renderer, font, "ESC: Apply & Resume", SCREEN_WIDTH/2 - 80, sy + 32, cyan);
+            renderText(renderer, font, "R: Restart", SCREEN_WIDTH/2 - 80, sy + 64, yellow);
         }
         SDL_RenderPresent(renderer);
     }
