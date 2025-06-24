@@ -50,5 +50,4 @@ private:
     Uint32 sim_start_time = 0;
     Uint32 last_gene_pool_save = 0;
     const Uint32 GENE_POOL_SAVE_INTERVAL = 5000;
-    int game_time_units = 0;
 }; 

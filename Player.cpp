@@ -155,12 +155,13 @@ bool Player::eatPlayer(Game& game, Player& other) {
     if (collide(other) && height > other.height * 1.2f) {
         playerEaten++;
         killTime = 0;
-        width += other.foodCount + EATEN_ADD;
-        height += other.foodCount + EATEN_ADD;
-        // Clamp size
+        if (other.foodCount == 0) foodCount += EATEN_ADD;
+        else foodCount += other.foodCount + EATEN_ADD;
+        // Sync size to foodCount
+        width = DOT_WIDTH + foodCount * FOOD_APPEND;
+        height = DOT_HEIGHT + foodCount * FOOD_APPEND;
         if (width > MAX_PLAYER_SIZE) width = MAX_PLAYER_SIZE;
         if (height > MAX_PLAYER_SIZE) height = MAX_PLAYER_SIZE;
-        if (other.foodCount == 0) foodCount += EATEN_ADD;
         other.alive = false;
         return true;
     }
@@ -180,8 +181,8 @@ bool Player::eatFood(Game& game) {
             foodCount++;
             foodScore++;
             killTime = 0;
-            width += FOOD_APPEND;
-            height += FOOD_APPEND;
+            width = DOT_WIDTH + foodCount * FOOD_APPEND;
+            height = DOT_HEIGHT + foodCount * FOOD_APPEND;
             if (width > MAX_PLAYER_SIZE) width = MAX_PLAYER_SIZE;
             if (height > MAX_PLAYER_SIZE) height = MAX_PLAYER_SIZE;
             auto it = std::find(game.foods.begin(), game.foods.end(), food);
@@ -340,8 +341,10 @@ void Player::update(Game& game) {
         killTime = 0;
         if (foodCount > 0) {
             foodCount--;
-            width = std::max(1, width - 2);
-            height = std::max(1, height - 2);
+            width = DOT_WIDTH + foodCount * FOOD_APPEND;
+            height = DOT_HEIGHT + foodCount * FOOD_APPEND;
+            if (width < DOT_WIDTH) width = DOT_WIDTH;
+            if (height < DOT_HEIGHT) height = DOT_HEIGHT;
         } else if (KILL) {
             alive = false;
         }

@@ -80,11 +80,8 @@ void Hunter::update(Game& game) {
             y += vy;
         }
     }
-    // Clamp to screen
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-    if (x > game.width - width) x = game.width - width;
-    if (y > game.height - height) y = game.height - height;
+    // Clamp to screen using Player's method
+    clamp_to_screen(game);
     // Eating logic
     eatFood(game);
     for (auto* other : game.players) {

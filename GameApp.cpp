@@ -1,9 +1,13 @@
 #include "GameApp.h"
+#include "Food.h"
 #include "Player.h"
+#include "Hunter.h"
 #include <fstream>
 #include <iostream>
 #include <algorithm>
 #include <map>
+
+extern int game_time_units;
 
 GameApp::GameApp() {}
 GameApp::~GameApp() {}
@@ -58,7 +62,6 @@ bool GameApp::init() {
     show_settings = false;
     sim_start_time = SDL_GetTicks();
     last_gene_pool_save = SDL_GetTicks();
-    game_time_units = 0;
     // Load gene pool
     Player::load_gene_pool("gene_pool.txt");
     // Create game
@@ -300,7 +303,6 @@ void GameApp::run() {
             SDL_Event logic_event;
             while (logic_max_mode && !quit) {
                 game->update();
-                game_time_units += sim_speed > 0 ? sim_speed : 1;
                 while (SDL_PollEvent(&logic_event)) {
                     if (logic_event.type == SDL_QUIT) quit = true;
                     if (logic_event.type == SDL_KEYDOWN) {
