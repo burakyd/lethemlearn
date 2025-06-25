@@ -1,7 +1,6 @@
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include "Game.h"
-#include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>

@@ -8,6 +8,12 @@
 #include <map>
 #include <iomanip>
 #include <sstream>
+#include <SDL.h>
+#include <SDL_ttf.h>
+#include <string>
+#include <vector>
+#include "Game.h"
+#include "Settings.h"
 
 extern int game_time_units;
 

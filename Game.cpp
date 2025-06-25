@@ -2,7 +2,6 @@
 #include "Player.h"
 #include "Food.h"
 #include "Hunter.h"
-#include <iostream>
 #include <cstdlib>
 #include <algorithm>
 #include <ctime>
@@ -96,14 +95,6 @@ void Game::render() {
     for (auto* h : hunters) if (h) h->draw(renderer);
     // Draw all foods
     for (auto* f : foods) if (f) f->draw(renderer);
-}
-
-void Game::handleEvents() {
-    // TODO: Implement event handling if needed
-}
-
-void Game::reset() {
-    // TODO: Reset game state
 }
 
 bool Game::inLocation(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
