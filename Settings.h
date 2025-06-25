@@ -26,11 +26,14 @@ constexpr int MAX_PLAYER_SIZE = 10 * DOT_WIDTH; // max player size
 // speed penalty over growth
 constexpr float PLAYER_MIN_SPEED_FACTOR = 0.5f; // lower limit for the speed penalty
 constexpr float PLAYER_SIZE_SPEED_EXPONENT = 0.7f; // Lower = less penalty, 1.0 = linear, 0.5 = sqrt
+// Player growth curve exponent (controls how fast size grows with food)
+constexpr float PLAYER_GROWTH_EXPONENT = 0.7f; // 0.5 = sqrt, 1.0 = linear, 0.7 = between
 
 // Food Settings
 constexpr int FOOD_WIDTH = 5;
 constexpr int FOOD_HEIGHT = 5;
 constexpr int FOOD_APPEND = 1; // reward for eating a food
+constexpr float EATEN_FACTOR = 0.3f; // fraction of the eaten player's food awarded to the eater
 constexpr int EATEN_ADD = 1; // additional reward for eating a player
 
 // Game Mechanics

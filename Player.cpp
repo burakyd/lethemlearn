@@ -156,7 +156,7 @@ bool Player::lookup_tables_initialized = false;
 void Player::init_lookup_tables() {
     // Fill food_to_size
     for (int f = 0; f <= MAX_FOOD; ++f) {
-        food_to_size[f] = DOT_WIDTH + int(FOOD_APPEND * std::sqrt(float(f)));
+        food_to_size[f] = DOT_WIDTH + int(FOOD_APPEND * std::pow(float(f), PLAYER_GROWTH_EXPONENT));
     }
     // Fill size_to_food
     for (int s = DOT_WIDTH; s <= MAX_PLAYER_SIZE; ++s) {
@@ -197,7 +197,7 @@ bool Player::eatPlayer(Game& game, Player& other) {
         playerEaten++;
         killTime = 0;
         if (other.foodCount == 0) foodCount += EATEN_ADD;
-        else foodCount += other.foodCount + EATEN_ADD;
+        else foodCount += other.foodCount * EATEN_FACTOR + EATEN_ADD;
         update_size_from_food();
         other.alive = false;
         return true;
