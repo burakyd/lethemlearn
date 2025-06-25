@@ -93,11 +93,20 @@ public:
 
     std::set<std::pair<int, int>> visited_cells;
     void update_exploration_cell(int cell_size, int world_width, int world_height);
+
+    // Hall of Fame for all-time best genes
+    static std::vector<GeneEntry> hall_of_fame;
+    static constexpr int HALL_OF_FAME_SIZE = 10;
+    static void update_hall_of_fame(float fitness, const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases);
+    static GeneEntry sample_hall_of_fame();
 };
 
 // Helper functions for gene crossover and mutation
 std::vector<std::vector<float>> crossover(const std::vector<std::vector<float>>&, const std::vector<std::vector<float>>&);
 void mutate_genes(std::vector<std::vector<float>>&, int nMutate = NUMBER_OF_MUTATES);
+// Bias crossover and mutation
+std::vector<std::vector<float>> crossover_biases(const std::vector<std::vector<float>>&, const std::vector<std::vector<float>>&);
+void mutate_biases(std::vector<std::vector<float>>&, int nMutate = NUMBER_OF_MUTATES);
 
 class HumanPlayer : public Player {
 public:

@@ -8,9 +8,11 @@
 #include <chrono>
 #include <fstream>
 #include <sstream>
+#include <iostream>
 #include "Settings.h"
 #include <vector>
 #include <SDL.h>
+extern int game_time_units;
 class Food;
 class Player;
 
@@ -246,6 +248,7 @@ NNInputsResult Player::get_nn_inputs(const Game& game) {
     }
     float diag = std::sqrt(game.width*game.width + game.height*game.height);
     float food_dist_scaled = min_food_dist / diag; // [0, 1]
+    food_dist_scaled = food_dist_scaled * 2.0f - 1.0f; // [-1, 1]
     float to_food_angle = std::atan2(food_dy, food_dx);
     float rel_food_angle = to_food_angle - angle;
     while (rel_food_angle < -M_PI) rel_food_angle += 2*M_PI;
@@ -253,7 +256,6 @@ NNInputsResult Player::get_nn_inputs(const Game& game) {
     float rel_food_angle_scaled = rel_food_angle / M_PI; // [-1, 1]
 
     // 2: Distance and relative angle to nearest player (not self)
-    // calculate from edges so that a bigger player wont be seen as more far than it is
     float min_player_dist = 1e6f, player_dx = 0, player_dy = 0;
     int nearest_player_width = DOT_WIDTH;
     for (auto* p : game.players) {
@@ -272,6 +274,7 @@ NNInputsResult Player::get_nn_inputs(const Game& game) {
         }
     }
     float player_dist_scaled = min_player_dist / diag; // [0, 1]
+    player_dist_scaled = player_dist_scaled * 2.0f - 1.0f; // [-1, 1]
     float to_player_angle = std::atan2(player_dy, player_dx);
     float rel_player_angle = to_player_angle - angle;
     while (rel_player_angle < -M_PI) rel_player_angle += 2*M_PI;
@@ -280,21 +283,30 @@ NNInputsResult Player::get_nn_inputs(const Game& game) {
 
     // 8: Own size (normalized to default size)
     float size_norm = float(width) / float(DOT_WIDTH); // 1.0 = default size
-    // 9: Own food count (normalized, clipped after 20)
-    float food_count_norm = std::min(1.0f, float(foodCount) / 20.0f);
+    size_norm = std::max(-1.0f, std::min(1.0f, (size_norm - 1.0f) / (float(MAX_PLAYER_SIZE)/float(DOT_WIDTH) - 1.0f) * 2.0f - 1.0f));
+    // 9: Own food count (normalized, clipped after 50)
+    float food_count_norm = std::min(1.0f, float(foodCount) / 50.0f);
+    food_count_norm = food_count_norm * 2.0f - 1.0f;
     // 10: Own normalized size (relative to max size)
-    float own_norm_size = float(width) / float(MAX_PLAYER_SIZE);
+    float own_norm_size = float(width) / float(MAX_PLAYER_SIZE); // [0,1]
+    own_norm_size = own_norm_size * 2.0f - 1.0f;
     // 11: Own food count (again, for new input)
     float own_food_count = food_count_norm;
     // 10-13: Wall distances (left, right, top, bottom, normalized)
     float left_wall = float(x) / game.width;
+    left_wall = left_wall * 2.0f - 1.0f;
     float right_wall = float(game.width - (x + width)) / game.width;
+    right_wall = right_wall * 2.0f - 1.0f;
     float top_wall = float(y) / game.height;
+    top_wall = top_wall * 2.0f - 1.0f;
     float bottom_wall = float(game.height - (y + height)) / game.height;
+    bottom_wall = bottom_wall * 2.0f - 1.0f;
 
     float speed_scaled = speed / MAX_SPEED;
+    speed_scaled = speed_scaled * 2.0f - 1.0f;
     // New input: size difference to nearest player (normalized)
     float size_diff = float(width - nearest_player_width) / float(DOT_WIDTH); // positive: bigger, negative: smaller
+    size_diff = std::max(-1.0f, std::min(1.0f, size_diff));
 
     // Multiply all inputs by scale factor after normalization/scaling
     food_dist_scaled *= SCALE_FOOD_DIST;
@@ -531,11 +543,26 @@ void Player::try_insert_gene_to_pool(float fitness, const std::vector<std::vecto
     // Insert if pool not full or fitness is better than the worst
     if (gene_pool.size() < GENE_POOL_SIZE) {
         gene_pool.push_back({fitness, genes, biases});
+        // Update Hall of Fame
+        update_hall_of_fame(fitness, genes, biases);
+        // Compute average fitness
+        float avg_fitness = 0.0f;
+        for (const auto& entry : gene_pool) avg_fitness += entry.fitness;
+        avg_fitness /= gene_pool.size();
+        std::cout << "Inserted fitness: " << fitness << ", game time(k): " << (int)(game_time_units/1000)
+                  << ", avg fitness: " << avg_fitness << std::endl;
     } else {
-        // Find worst
         auto min_it = std::min_element(gene_pool.begin(), gene_pool.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness < b.fitness; });
         if (fitness > min_it->fitness) {
             *min_it = {fitness, genes, biases};
+            // Update Hall of Fame
+            update_hall_of_fame(fitness, genes, biases);
+            // Compute average fitness
+            float avg_fitness = 0.0f;
+            for (const auto& entry : gene_pool) avg_fitness += entry.fitness;
+            avg_fitness /= gene_pool.size();
+            std::cout << "Replaced worst with fitness: " << fitness << ", game time(k): " << (int)(game_time_units/1000)
+                      << ", avg fitness: " << avg_fitness << std::endl;
         } else {
             return;
         }
@@ -663,4 +690,64 @@ void HumanPlayer::update(Game& game) {
     }
     last_angle = angle;
     last_speed = speed;
+}
+
+// --- Crossover for biases ---
+std::vector<std::vector<float>> crossover_biases(const std::vector<std::vector<float>>& b1, const std::vector<std::vector<float>>& b2) {
+    std::vector<std::vector<float>> result = b1;
+    for (size_t l = 0; l < b1.size(); ++l) {
+        int size = b1[l].size();
+        int method = rand() % 3; // 0: uniform, 1: single-point, 2: arithmetic
+        if (method == 0) { // Uniform crossover
+            for (int i = 0; i < size; ++i) {
+                result[l][i] = (rand() % 2 == 0) ? b1[l][i] : b2[l][i];
+            }
+        } else if (method == 1) { // Single-point crossover
+            int point = rand() % size;
+            for (int i = 0; i < size; ++i) {
+                result[l][i] = (i < point) ? b1[l][i] : b2[l][i];
+            }
+        } else { // Arithmetic crossover
+            float alpha = ((float)rand() / RAND_MAX);
+            for (int i = 0; i < size; ++i) {
+                result[l][i] = alpha * b1[l][i] + (1.0f - alpha) * b2[l][i];
+            }
+        }
+    }
+    return result;
+}
+
+void mutate_biases(std::vector<std::vector<float>>& biases, int nMutate) {
+    for (int m = 0; m < nMutate; ++m) {
+        int l = rand() % biases.size();
+        int idx = rand() % biases[l].size();
+        float noise = ((float)rand() / RAND_MAX) * 0.2f - 0.1f;
+        if (rand() % 20 == 0) noise *= 5.0f;
+        biases[l][idx] += noise;
+        if (rand() % 100 == 0) biases[l][idx] = ((float)rand() / RAND_MAX * 2 - 1) * 0.5f;
+    }
+}
+
+// Hall of Fame for all-time best genes
+std::vector<Player::GeneEntry> Player::hall_of_fame;
+
+void Player::update_hall_of_fame(float fitness, const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases) {
+    // Insert if not full, or replace worst if better
+    if (hall_of_fame.size() < HALL_OF_FAME_SIZE) {
+        hall_of_fame.push_back({fitness, genes, biases});
+    } else {
+        auto min_it = std::min_element(hall_of_fame.begin(), hall_of_fame.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness < b.fitness; });
+        if (fitness > min_it->fitness) {
+            *min_it = {fitness, genes, biases};
+        } else {
+            return;
+        }
+    }
+    std::sort(hall_of_fame.begin(), hall_of_fame.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness > b.fitness; });
+}
+
+Player::GeneEntry Player::sample_hall_of_fame() {
+    if (hall_of_fame.empty()) throw std::runtime_error("Hall of Fame is empty");
+    int idx = rand() % hall_of_fame.size();
+    return hall_of_fame[idx];
 } 
