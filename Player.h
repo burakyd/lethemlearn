@@ -79,6 +79,15 @@ public:
     static GeneEntry sample_gene_from_pool();
     bool is_human = false;
     void clamp_to_screen(const Game& game);
+    void update_size_from_food();
+    void decrease_size_step();
+
+    // Lookup table optimization
+    static constexpr int MAX_FOOD = 2000;
+    static int food_to_size[MAX_FOOD + 1];
+    static int size_to_food[MAX_PLAYER_SIZE + 1];
+    static void init_lookup_tables();
+    static bool lookup_tables_initialized;
 };
 
 // Helper functions for gene crossover and mutation

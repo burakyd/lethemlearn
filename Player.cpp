@@ -150,6 +150,49 @@ bool Player::collide(const Player& other) const {
     return dist2 < threshold * threshold;
 }
 
+// Static variable definitions
+int Player::food_to_size[MAX_FOOD + 1];
+int Player::size_to_food[MAX_PLAYER_SIZE + 1];
+bool Player::lookup_tables_initialized = false;
+
+void Player::init_lookup_tables() {
+    // Fill food_to_size
+    for (int f = 0; f <= MAX_FOOD; ++f) {
+        food_to_size[f] = DOT_WIDTH + int(FOOD_APPEND * std::sqrt(float(f)));
+    }
+    // Fill size_to_food
+    for (int s = DOT_WIDTH; s <= MAX_PLAYER_SIZE; ++s) {
+        // Find the smallest foodCount that gives at least this size
+        for (int f = 0; f <= MAX_FOOD; ++f) {
+            if (food_to_size[f] >= s) {
+                size_to_food[s] = f;
+                break;
+            }
+        }
+    }
+    lookup_tables_initialized = true;
+}
+
+void Player::update_size_from_food() {
+    if (!lookup_tables_initialized) init_lookup_tables();
+    int fc = std::max(0, std::min(foodCount, MAX_FOOD));
+    width = food_to_size[fc];
+    height = food_to_size[fc];
+    if (width < DOT_WIDTH) width = DOT_WIDTH;
+    if (height < DOT_HEIGHT) height = DOT_HEIGHT;
+    if (width > MAX_PLAYER_SIZE) width = MAX_PLAYER_SIZE;
+    if (height > MAX_PLAYER_SIZE) height = MAX_PLAYER_SIZE;
+}
+
+void Player::decrease_size_step() {
+    if (!lookup_tables_initialized) init_lookup_tables();
+    int current_width = width;
+    int new_width = std::max(DOT_WIDTH, current_width - 1);
+    int new_food = size_to_food[new_width];
+    foodCount = new_food;
+    update_size_from_food();
+}
+
 bool Player::eatPlayer(Game& game, Player& other) {
     if (!other.alive || &other == this) return false;
     if (collide(other) && height > other.height * 1.2f) {
@@ -157,11 +200,7 @@ bool Player::eatPlayer(Game& game, Player& other) {
         killTime = 0;
         if (other.foodCount == 0) foodCount += EATEN_ADD;
         else foodCount += other.foodCount + EATEN_ADD;
-        // Sync size to foodCount
-        width = DOT_WIDTH + foodCount * FOOD_APPEND;
-        height = DOT_HEIGHT + foodCount * FOOD_APPEND;
-        if (width > MAX_PLAYER_SIZE) width = MAX_PLAYER_SIZE;
-        if (height > MAX_PLAYER_SIZE) height = MAX_PLAYER_SIZE;
+        update_size_from_food();
         other.alive = false;
         return true;
     }
@@ -181,10 +220,7 @@ bool Player::eatFood(Game& game) {
             foodCount++;
             foodScore++;
             killTime = 0;
-            width = DOT_WIDTH + foodCount * FOOD_APPEND;
-            height = DOT_HEIGHT + foodCount * FOOD_APPEND;
-            if (width > MAX_PLAYER_SIZE) width = MAX_PLAYER_SIZE;
-            if (height > MAX_PLAYER_SIZE) height = MAX_PLAYER_SIZE;
+            update_size_from_food();
             auto it = std::find(game.foods.begin(), game.foods.end(), food);
             if (it != game.foods.end()) {
                 delete food;
@@ -313,13 +349,13 @@ void Player::apply_nn_output(const std::array<float, NN_OUTPUTS>& nn_output) {
     float angle_diff = desired_angle - angle;
     while (angle_diff < -M_PI) angle_diff += 2*M_PI;
     while (angle_diff > M_PI) angle_diff -= 2*M_PI;
-    float max_turn = 1.0f; // radians per frame (even more sensitive)
+    float max_turn = 1.0f; // radians per frame
     if (fabs(angle_diff) > max_turn)
         angle_diff = (angle_diff > 0 ? 1 : -1) * max_turn;
     angle += angle_diff;
     while (angle < 0) angle += 2.0f * M_PI;
     while (angle >= 2.0f * M_PI) angle -= 2.0f * M_PI;
-    // Set speed as an absolute value, scaled by size
+    // Slow down with size growth
     float size_factor = float(DOT_WIDTH) / float(width);
     float min_speed_factor = 0.3f; // Minimum 30% of MAX_SPEED
     size_factor = std::max(size_factor, min_speed_factor);
@@ -340,25 +376,22 @@ void Player::update(Game& game) {
     if (killTime >= KILL_TIME) {
         killTime = 0;
         if (foodCount > 0) {
-            foodCount--;
-            width = DOT_WIDTH + foodCount * FOOD_APPEND;
-            height = DOT_HEIGHT + foodCount * FOOD_APPEND;
-            if (width < DOT_WIDTH) width = DOT_WIDTH;
-            if (height < DOT_HEIGHT) height = DOT_HEIGHT;
+            decrease_size_step();
         } else if (KILL) {
             alive = false;
         }
     }
     if (!alive) return;
     if (MITOSIS > 0 && foodCount >= 2 && rand() % MITOSIS == 0) {
-        int new_width = std::max(1, width / 2);
-        int new_height = std::max(1, height / 2);
+        int child_food = foodCount / 2;
         std::vector<std::vector<float>> child_genes1 = mitosis(true);
         std::vector<std::vector<float>> child_genes2 = mitosis(true);
-        Player* child1 = new Player(child_genes1, new_width, new_height, color, x, y, parent_id);
-        Player* child2 = new Player(child_genes2, new_width, new_height, color, x, y, parent_id);
-        child1->foodCount = foodCount / 2;
-        child2->foodCount = foodCount / 2;
+        Player* child1 = new Player(child_genes1, DOT_WIDTH + child_food * FOOD_APPEND, DOT_HEIGHT + child_food * FOOD_APPEND, color, x, y, parent_id);
+        Player* child2 = new Player(child_genes2, DOT_WIDTH + child_food * FOOD_APPEND, DOT_HEIGHT + child_food * FOOD_APPEND, color, x, y, parent_id);
+        child1->foodCount = child_food;
+        child2->foodCount = child_food;
+        child1->update_size_from_food();
+        child2->update_size_from_food();
         game.players.push_back(child1);
         game.players.push_back(child2);
         alive = false;
@@ -563,9 +596,7 @@ void HumanPlayer::update(Game& game) {
     if (killTime >= KILL_TIME) {
         killTime = 0;
         if (foodCount > 0) {
-            foodCount--;
-            width = std::max(1, width - 2);
-            height = std::max(1, height - 2);
+            decrease_size_step();
         } else if (KILL) {
             alive = false;
         }
