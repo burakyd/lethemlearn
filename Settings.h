@@ -52,7 +52,7 @@ constexpr bool KILL = true;
 constexpr bool PLAYER_ENABLED = true;
 
 // Evolution Settings
-constexpr int MITOSIS = 15000; // 1/MITOSIS chance of mitosis
+constexpr int MITOSIS = 0; // 1/MITOSIS chance of mitosis - 0 means no mitosis occurs
 constexpr bool DO_MUTATE = true;
 constexpr int NUMBER_OF_MUTATES = 3;
 
