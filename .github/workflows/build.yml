@@ -27,6 +27,7 @@ jobs:
       run: |
         brew update
         brew install cmake sdl2 sdl2_ttf
+        echo "PKG_CONFIG_PATH=$(brew --prefix sdl2)/lib/pkgconfig:$(brew --prefix sdl2_ttf)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
     - name: Install dependencies (Windows)
       if: runner.os == 'Windows'
@@ -36,6 +37,8 @@ jobs:
 
     - name: Configure CMake
       run: cmake -S . -B build
+      env:
+        PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
 
     - name: Build
       run: cmake --build build --config Release
