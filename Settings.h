@@ -23,13 +23,15 @@ constexpr int RANDOM_SIZE_MAX = 15;
 constexpr std::array<int, 3> DOT_COLOR = GREEN;
 constexpr float MAX_SPEED = 2.0f; // max speed of the players
 constexpr int MAX_PLAYER_SIZE = 10 * DOT_WIDTH; // max player size
-
+// speed penalty over growth
+constexpr float PLAYER_MIN_SPEED_FACTOR = 0.5f; // lower limit for the speed penalty
+constexpr float PLAYER_SIZE_SPEED_EXPONENT = 0.7f; // Lower = less penalty, 1.0 = linear, 0.5 = sqrt
 
 // Food Settings
 constexpr int FOOD_WIDTH = 5;
 constexpr int FOOD_HEIGHT = 5;
 constexpr int FOOD_APPEND = 1; // reward for eating a food
-constexpr int EATEN_ADD = 0; // additional reward for eating a player
+constexpr int EATEN_ADD = 1; // additional reward for eating a player
 
 // Game Mechanics
 constexpr int KILL_TIME = 500;
@@ -105,3 +107,10 @@ constexpr float MUTATION_RATE = 0.1f; // 10% mutation rate
 constexpr float LARGE_MUTATION_RATE = 0.02f; // 2% large mutation
 constexpr float MIN_FITNESS_FOR_GENE_POOL = 100.0f;
 constexpr int GENE_POOL_PRUNE_INTERVAL = 10; // generations
+
+// Hunger/food decrease parameters
+constexpr float HUNGER_BASE = 0.5f;           // Minimum food loss per interval
+constexpr float HUNGER_SCALE = 0.005f;        // Scale for size-based food loss
+constexpr float HUNGER_EXPONENT = 1.1f;       // Exponent for sublinear growth
+constexpr int HUNGER_MIN = 1;                 // Minimum food loss per interval
+constexpr int HUNGER_MAX = 3;                 // Maximum food loss per interval

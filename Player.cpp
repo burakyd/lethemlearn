@@ -358,8 +358,8 @@ void Player::apply_nn_output(const std::array<float, NN_OUTPUTS>& nn_output) {
     while (angle < 0) angle += 2.0f * M_PI;
     while (angle >= 2.0f * M_PI) angle -= 2.0f * M_PI;
     // Slow down with size growth
-    float size_factor = float(DOT_WIDTH) / float(width);
-    float min_speed_factor = 0.3f; // Minimum 30% of MAX_SPEED
+    float size_factor = std::pow(float(DOT_WIDTH) / float(width), PLAYER_SIZE_SPEED_EXPONENT);
+    float min_speed_factor = PLAYER_MIN_SPEED_FACTOR; // Minimum speed factor, now tunable
     size_factor = std::max(size_factor, min_speed_factor);
     float effective_max_speed = MAX_SPEED * size_factor;
     speed = std::max(0.0f, std::min(nn_output[1], effective_max_speed));
@@ -385,7 +385,11 @@ void Player::update(Game& game) {
     if (killTime >= KILL_TIME) {
         killTime = 0;
         if (foodCount > 0) {
-            int food_loss = std::ceil(1 + 0.05 * std::sqrt(width));
+            // Improved, gentler hunger curve
+            float base = HUNGER_BASE;
+            float scale = HUNGER_SCALE;
+            float exponent = HUNGER_EXPONENT;
+            int food_loss = std::clamp(int(std::ceil(base + scale * std::pow(width, exponent))), HUNGER_MIN, HUNGER_MAX);
             for (int i = 0; i < food_loss && foodCount > 0; ++i) {
                 decrease_size_step();
             }
@@ -623,9 +627,9 @@ void HumanPlayer::update(Game& game) {
     float dx = mouse_x - x;
     float dy = mouse_y - y;
     float dist = std::sqrt(dx * dx + dy * dy);
-    float size_factor = float(DOT_WIDTH) / float(width);
-    float min_speed_factor = 0.3f; // Minimum 30% of MAX_SPEED
-    size_factor = std::max(size_factor, min_speed_factor);
+    // decrease size - curved
+    float size_factor = std::pow(float(DOT_WIDTH) / float(width), PLAYER_SIZE_SPEED_EXPONENT);
+    size_factor = std::max(size_factor, PLAYER_MIN_SPEED_FACTOR);
     float effective_max_speed = MAX_SPEED * size_factor;
     float move_speed = effective_max_speed * (1.0f - std::exp(-dist / 50.0f));
     float move_x = 0.0f, move_y = 0.0f;
