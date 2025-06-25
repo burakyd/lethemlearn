@@ -441,6 +441,11 @@ void Player::update(Game& game) {
     while (rel_player_angle < -M_PI) rel_player_angle += 2*M_PI;
     while (rel_player_angle > M_PI) rel_player_angle -= 2*M_PI;
     last_rel_player_angle = rel_player_angle;
+    // Track frames spent near wall/corner (size-aware)
+    if (x - width / 2 < 20 || x + width / 2 > game.width - 20 ||
+        y - height / 2 < 20 || y + height / 2 > game.height - 20) {
+        time_near_wall++;
+    }
 }
 
 void Player::draw(SDL_Renderer* renderer) {

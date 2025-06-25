@@ -34,17 +34,17 @@ constexpr int FOOD_WIDTH = 5;
 constexpr int FOOD_HEIGHT = 5;
 constexpr int FOOD_APPEND = 1; // reward for eating a food
 constexpr float EATEN_FACTOR = 0.3f; // fraction of the eaten player's food awarded to the eater
-constexpr int EATEN_ADD = 1; // additional reward for eating a player
+constexpr int EATEN_ADD = 0; // additional reward for eating a player
 
 // Game Mechanics
 constexpr int KILL_TIME = 500;
 constexpr int NUMBER_OF_FOODS = 40;
-constexpr int BOTS = 50;
+constexpr int BOTS = 100;
 constexpr int HUNTERS = 5;
 constexpr int HUNTER_WIDTH = 30;
 constexpr int HUNTER_HEIGHT = 30;
 constexpr std::array<int, 3> HUNTER_COLOR = RED;
-constexpr int MIN_BOT = 30;
+constexpr int MIN_BOT = 25;
 constexpr bool ADD_NEW_WHEN_DIE = true;
 constexpr bool KILL = true;
 
@@ -75,15 +75,15 @@ constexpr std::array<std::tuple<int, int>, 4> NEURAL_NET_SHAPE = {
 // This is done after normalization to [-1,1], so the players are more sensitive to environmental changes
 // Can be individually changed to increase/decrease the effect of a feature
 // Works like a Gain Layer
-constexpr float SCALE_FOOD_DIST = 10.0f;
-constexpr float SCALE_FOOD_ANGLE = 10.0f;
-constexpr float SCALE_PLAYER_DIST = 6.0f;
-constexpr float SCALE_PLAYER_ANGLE = 6.0f;
-constexpr float SCALE_WALL = 1.0f;
-constexpr float SCALE_SPEED = 1.0f;
-constexpr float SCALE_SIZE_DIFF = 6.0f;
-constexpr float SCALE_OWN_FOOD = 4.0f;
-constexpr float SCALE_OWN_SIZE = 4.0f;
+constexpr float SCALE_FOOD_DIST = 20.0f;
+constexpr float SCALE_FOOD_ANGLE = 20.0f;
+constexpr float SCALE_PLAYER_DIST = 12.0f;
+constexpr float SCALE_PLAYER_ANGLE = 12.0f;
+constexpr float SCALE_WALL = 2.0f;
+constexpr float SCALE_SPEED = 2.0f;
+constexpr float SCALE_SIZE_DIFF = 12.0f;
+constexpr float SCALE_OWN_FOOD = 8.0f;
+constexpr float SCALE_OWN_SIZE = 8.0f;
 
 // Smoothing factor for temporal smoothing of NN inputs
 // 0 means no change in inputs, 1 means instant change to the new value
@@ -117,3 +117,6 @@ constexpr float HUNGER_SCALE = 0.005f;        // Scale for size-based food loss
 constexpr float HUNGER_EXPONENT = 1.1f;       // Exponent for sublinear growth
 constexpr int HUNGER_MIN = 1;                 // Minimum food loss per interval
 constexpr int HUNGER_MAX = 3;                 // Maximum food loss per interval
+
+// New constant for the wall/corner penalty per time unit spent near the wall (WALL_PENALTY_PER_FRAME), default -0.2f.
+constexpr float WALL_PENALTY_PER_FRAME = -0.2f; // Penalty per time unit spent near wall/corner

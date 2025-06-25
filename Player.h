@@ -61,6 +61,7 @@ public:
     float smoothed_size_diff = 0.0f;
     float smoothed_own_norm_size = 0.0f;
     float smoothed_own_food_count = 0.0f;
+    int time_near_wall = 0; // Counts frames spent near wall/corner
     void initialize_weights_xavier();
     NNInputsResult get_nn_inputs(const Game& game);
     void apply_nn_output(const std::array<float, NN_OUTPUTS>& nn_output);
