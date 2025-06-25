@@ -23,7 +23,7 @@ namespace {
 }
 
 Player::Player(int width, int height, std::array<int, 3> color, float x, float y, bool alive)
-    : width(width), height(height), color(color), x(x), y(y), alive(alive), foodCount(0), lifeTime(0), killTime(0), foodScore(0), playerEaten(0), parent_id(-1)
+    : width(width), height(height), color(color), x(x), y(y), alive(alive), foodCount(0), lifeTime(0), killTime(0), foodScore(0), playerEaten(0), parent_id(-1), totalFoodEaten(0), totalPlayersEaten(0)
 {
     std::vector<int> layer_sizes = {NN_INPUTS, NN_H1, NN_H2, NN_H3, NN_OUTPUTS};
     genes.clear();
@@ -46,9 +46,8 @@ Player::Player(int width, int height, std::array<int, 3> color, float x, float y
 }
 
 Player::Player(const std::vector<std::vector<float>>& parent_genes, int width, int height, std::array<int, 3> color, float x, float y, int parent_id)
-    : width(width), height(height), color(color), x(x), y(y), alive(true), foodCount(0), lifeTime(0), killTime(0), foodScore(0), playerEaten(0), parent_id(parent_id)
+    : genes(parent_genes), width(width), height(height), color(color), x(x), y(y), alive(true), foodCount(0), lifeTime(0), killTime(0), foodScore(0), playerEaten(0), parent_id(parent_id), totalFoodEaten(0), totalPlayersEaten(0)
 {
-    genes = parent_genes;
     biases.resize(genes.size());
     for (size_t l = 0; l < biases.size(); ++l) {
         biases[l].resize(genes[l].size() / (l == genes.size() - 1 ? NN_H3 : (l == 0 ? NN_INPUTS : (l == 1 ? NN_H1 : NN_H2))));
@@ -197,6 +196,7 @@ bool Player::eatPlayer(Game& game, Player& other) {
     if (!other.alive || &other == this) return false;
     if (collide(other) && height > other.height * 1.2f) {
         playerEaten++;
+        totalPlayersEaten++;
         killTime = 0;
         if (other.foodCount == 0) foodCount += EATEN_ADD;
         else foodCount += other.foodCount * EATEN_FACTOR + EATEN_ADD;
@@ -219,6 +219,7 @@ bool Player::eatFood(Game& game) {
         if (dist2 < threshold * threshold) {
             foodCount++;
             foodScore++;
+            totalFoodEaten++;
             killTime = 0;
             update_size_from_food();
             auto it = std::find(game.foods.begin(), game.foods.end(), food);

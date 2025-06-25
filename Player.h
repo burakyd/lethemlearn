@@ -33,6 +33,8 @@ public:
     std::array<int, 3> color;
     float speed;
     int foodCount, lifeTime, killTime, foodScore, playerEaten;
+    int totalFoodEaten = 0;
+    int totalPlayersEaten = 0;
     bool alive;
     int parent_id;
     std::vector<std::vector<float>> shape;

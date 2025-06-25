@@ -218,11 +218,15 @@ void Game::maintain_population() {
     static constexpr int ADAPTIVE_MUTATION_PATIENCE = 20;
     static constexpr float ADAPTIVE_MUTATION_FACTOR = 2.0f;
     // fitness calculation lambda
-    auto calc_fitness = [this](Player* p, float w_food, float w_life, float w_dist, float w_size, float w_explore, float min_food, float min_life, float early_death_time, float early_death_penalty) {
+    auto calc_fitness = [this](Player* p, float w_food, float w_life, float w_explore, float w_total_players, float min_food, float min_life, float early_death_time, float early_death_penalty) {
         float exploration_bonus = w_explore * p->visited_cells.size();
         float wall_camping_penalty = WALL_PENALTY_PER_FRAME * p->time_near_wall;
-        float fitness = w_food * p->foodScore + w_life * p->lifeTime + w_dist * p->distance_traveled + w_size * (p->width - DOT_WIDTH) + exploration_bonus + wall_camping_penalty;
-        if (p->foodScore < min_food || p->lifeTime < min_life) fitness = 0.0f;
+        float fitness = w_food * p->totalFoodEaten
+            + w_life * p->lifeTime
+            + exploration_bonus
+            + w_total_players * p->totalPlayersEaten
+            + wall_camping_penalty;
+        if (p->totalFoodEaten < min_food || p->lifeTime < min_life) fitness = 0.0f;
         if (p->lifeTime < early_death_time) fitness -= early_death_penalty;
         return fitness;
     };
@@ -234,7 +238,7 @@ void Game::maintain_population() {
         if (!p->alive && !is_hunter) {
             if (!p->is_human) {
                 // Use the same weights/thresholds as in sorting for consistency
-                float fitness = calc_fitness(p, 10.0f, 1.0f, 0.05f, 2.0f, 3.0f, 5, 2000, 1000, 50.0f);
+                float fitness = calc_fitness(p, 10.0f, 1.0f, 3.0f, 5.0f, 5, 2000, 1000, 50.0f);
                 if (fitness >= MIN_FITNESS_FOR_GENE_POOL) {
                     Player::try_insert_gene_to_pool(fitness, p->genes, p->biases);
                 }
@@ -258,14 +262,14 @@ void Game::maintain_population() {
         if (!p->is_human) sorted_alive.push_back(p);
     }
     std::sort(sorted_alive.begin(), sorted_alive.end(), [this, &calc_fitness](Player* a, Player* b) {
-        float fitness_a = calc_fitness(a, 10.0f, 1.0f, 0.05f, 2.0f, 3.0f, 5, 2000, 1000, 50.0f);
-        float fitness_b = calc_fitness(b, 10.0f, 1.0f, 0.05f, 2.0f, 3.0f, 5, 2000, 1000, 50.0f);
+        float fitness_a = calc_fitness(a, 10.0f, 1.0f, 3.0f, 5.0f, 5, 2000, 1000, 50.0f);
+        float fitness_b = calc_fitness(b, 10.0f, 1.0f, 3.0f, 5.0f, 5, 2000, 1000, 50.0f);
         return fitness_a > fitness_b;
     });
     int n_elites = std::max(1, int(ELITISM_PERCENT * float(MIN_BOT)));
     std::vector<Player*> elites;
     for (int i = 0; i < n_elites && i < (int)sorted_alive.size(); ++i) {
-        if (sorted_alive[i]->foodScore >= MIN_FOOD_FOR_REPRO && sorted_alive[i]->lifeTime >= MIN_LIFETIME_FOR_REPRO) {
+        if (sorted_alive[i]->totalFoodEaten >= MIN_FOOD_FOR_REPRO && sorted_alive[i]->lifeTime >= MIN_LIFETIME_FOR_REPRO) {
             elites.push_back(sorted_alive[i]);
         }
     }
