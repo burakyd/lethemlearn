@@ -315,6 +315,7 @@ void GameApp::run() {
         }
         if (!paused) {
             if (sim_speed == -1) {
+                // MAX - do as much as updates while keeping the rendering up
                 Uint32 start = SDL_GetTicks();
                 int updates = 0;
                 while (SDL_GetTicks() - start < 10) {
@@ -322,6 +323,7 @@ void GameApp::run() {
                     ++updates;
                 }
             } else {
+                // <sim_speed>X - do sim_speed updates before rendering 
                 for (int i = 0; i < sim_speed; ++i) {
                     game->update();
                 }

@@ -372,9 +372,16 @@ void Player::clamp_to_screen(const Game& game) {
     if (y > game.height - height / 2.0f) y = game.height - height / 2.0f;
 }
 
+void Player::update_exploration_cell(int cell_size, int world_width, int world_height) {
+    int cx = std::clamp(int(x) / cell_size, 0, world_width / cell_size - 1);
+    int cy = std::clamp(int(y) / cell_size, 0, world_height / cell_size - 1);
+    visited_cells.insert({cx, cy});
+}
+
 void Player::update(Game& game) {
     lifeTime++;
     killTime++;
+    update_exploration_cell(Game::CELL_SIZE, game.width, game.height);
     if (killTime >= KILL_TIME) {
         killTime = 0;
         if (foodCount > 0) {
@@ -598,6 +605,7 @@ HumanPlayer::HumanPlayer(int width, int height, std::array<int, 3> color, float 
 void HumanPlayer::update(Game& game) {
     lifeTime++;
     killTime++;
+    update_exploration_cell(Game::CELL_SIZE, game.width, game.height);
     if (killTime >= KILL_TIME) {
         killTime = 0;
         if (foodCount > 0) {

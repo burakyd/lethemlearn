@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 #include <utility>
+#include "Settings.h"
 
 #define MIN_FOOD_FOR_REPRO 2
 #define MIN_LIFETIME_FOR_REPRO 2000
@@ -217,17 +218,37 @@ void Game::randomFood(int num) {
     }
 }
 
+// Maintains population, gene pool, elitism, crossover and other mechanisms of Genetic Algorithm
 void Game::maintain_population() {
+    static int generation = 0;
     // Remove dead players (but not hunters)
     for (auto it = players.begin(); it != players.end(); ) {
         Player* p = *it;
         bool is_hunter = false;
         for (auto* h : hunters) if (h == p) is_hunter = true;
         if (!p->alive && !is_hunter) {
-            // Insert genes into pool before deleting
+            // Insert genes into pool before deleting if fitness is high enough
             if (!p->is_human) {
-                float fit = float(p->foodScore) * float(p->lifeTime) + p->distance_traveled;
-                Player::try_insert_gene_to_pool(fit, p->genes, p->biases);
+                // Use the same fitness function as sorting
+                const float w_food = 10.0f;
+                const float w_life = 1.0f;
+                const float w_dist = 0.05f;
+                const float w_size = 2.0f;
+                const float w_explore = 3.0f;
+                const float min_food = 2;
+                const float min_life = 1000;
+                const float early_death_time = 500;
+                const float early_death_penalty = 50.0f;
+                float wall_penalty = 0.0f;
+                if (p->x < 20 || p->x > width - 20) wall_penalty -= 10.0f;
+                if (p->y < 20 || p->y > height - 20) wall_penalty -= 10.0f;
+                float exploration_bonus = w_explore * p->visited_cells.size();
+                float fitness = w_food * p->foodScore + w_life * p->lifeTime + w_dist * p->distance_traveled + w_size * (p->width - DOT_WIDTH) + wall_penalty + exploration_bonus;
+                if (p->foodScore < min_food || p->lifeTime < min_life) fitness = 0.0f;
+                if (p->lifeTime < early_death_time) fitness -= early_death_penalty;
+                if (fitness >= MIN_FITNESS_FOR_GENE_POOL) {
+                    Player::try_insert_gene_to_pool(fitness, p->genes, p->biases);
+                }
             }
             delete p;
             it = players.erase(it);
@@ -242,83 +263,95 @@ void Game::maintain_population() {
         for (auto* h : hunters) if (h == p) is_hunter = true;
         if (p->alive && !is_hunter) alive_bots.push_back(p);
     }
-    // Elitism: keep best agent unchanged, but only if it is truly best
-    const int N_ELITES = 3;
+    // Dynamic elitism: top ELITISM_PERCENT
     std::vector<Player*> sorted_alive;
     for (auto* p : alive_bots) {
         if (!p->is_human) sorted_alive.push_back(p);
     }
-    std::sort(sorted_alive.begin(), sorted_alive.end(), [](Player* a, Player* b) {
-        // Wall penalty
+    std::sort(sorted_alive.begin(), sorted_alive.end(), [this](Player* a, Player* b) {
+        // Improved fitness function with exploration bonus
+        const float w_food = 10.0f;
+        const float w_life = 1.0f;
+        const float w_dist = 0.05f;
+        const float w_size = 2.0f;
+        const float w_explore = 3.0f; // exploration bonus weight
+        const float min_food = 5;
+        const float min_life = 2000;
+        const float early_death_time = 1000;
+        const float early_death_penalty = 50.0f;
         float wall_penalty_a = 0.0f;
-        if (a->x < 20 || a->x > a->width - 20) wall_penalty_a -= 10.0f;
-        if (a->y < 20 || a->y > a->height - 20) wall_penalty_a -= 10.0f;
-        // Reward for distance traveled
-        float fitness_a = float(a->foodScore) * float(a->lifeTime) + wall_penalty_a + a->distance_traveled;
-
+        if (a->x < 20 || a->x > width - 20) wall_penalty_a -= 10.0f;
+        if (a->y < 20 || a->y > height - 20) wall_penalty_a -= 10.0f;
+        float exploration_bonus_a = w_explore * a->visited_cells.size();
+        float fitness_a = w_food * a->foodScore + w_life * a->lifeTime + w_dist * a->distance_traveled + w_size * (a->width - DOT_WIDTH) + wall_penalty_a + exploration_bonus_a;
+        if (a->foodScore < min_food || a->lifeTime < min_life) fitness_a = 0.0f;
+        if (a->lifeTime < early_death_time) fitness_a -= early_death_penalty;
         float wall_penalty_b = 0.0f;
-        if (b->x < 20 || b->x > b->width - 20) wall_penalty_b -= 10.0f;
-        if (b->y < 20 || b->y > b->height - 20) wall_penalty_b -= 10.0f;
-        float fitness_b = float(b->foodScore) * float(b->lifeTime) + wall_penalty_b + b->distance_traveled;
-
+        if (b->x < 20 || b->x > width - 20) wall_penalty_b -= 10.0f;
+        if (b->y < 20 || b->y > height - 20) wall_penalty_b -= 10.0f;
+        float exploration_bonus_b = w_explore * b->visited_cells.size();
+        float fitness_b = w_food * b->foodScore + w_life * b->lifeTime + w_dist * b->distance_traveled + w_size * (b->width - DOT_WIDTH) + wall_penalty_b + exploration_bonus_b;
+        if (b->foodScore < min_food || b->lifeTime < min_life) fitness_b = 0.0f;
+        if (b->lifeTime < early_death_time) fitness_b -= early_death_penalty;
         return fitness_a > fitness_b;
     });
+    int n_elites = std::max(1, int(ELITISM_PERCENT * float(MIN_BOT)));
     std::vector<Player*> elites;
-    for (int i = 0; i < N_ELITES && i < (int)sorted_alive.size(); ++i) {
+    for (int i = 0; i < n_elites && i < (int)sorted_alive.size(); ++i) {
         if (sorted_alive[i]->foodScore >= MIN_FOOD_FOR_REPRO && sorted_alive[i]->lifeTime >= MIN_LIFETIME_FOR_REPRO) {
             elites.push_back(sorted_alive[i]);
         }
     }
     int clones_added = 0;
-    std::vector<bool> elite_cloned(N_ELITES, false);
+    std::vector<bool> elite_cloned(n_elites, false);
+    // Prune gene pool every GENE_POOL_PRUNE_INTERVAL generations
+    if (generation % GENE_POOL_PRUNE_INTERVAL == 0 && Player::gene_pool.size() > GENE_POOL_SIZE) {
+        std::sort(Player::gene_pool.begin(), Player::gene_pool.end(), [](const Player::GeneEntry& a, const Player::GeneEntry& b) { return a.fitness > b.fitness; });
+        Player::gene_pool.resize(GENE_POOL_SIZE);
+    }
+    // Fill up population
     while (alive_bots.size() < MIN_BOT) {
-        // Increase random agent injection probability
-        if ((rand() % 100 < 40) || alive_bots.empty()) {
+        // 30% chance: inject random agent for diversity
+        if ((rand() % 100 < 30) || alive_bots.empty()) {
             std::array<int, 3> color = {rand() % 256, rand() % 256, rand() % 256};
             players.push_back(new Player(DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));
         } else {
-            // Clone each elite at most once
-            bool cloned = false;
-            for (int e = 0; e < (int)elites.size(); ++e) {
-                if (!elite_cloned[e] && elites[e]->foodScore >= MIN_FOOD_FOR_REPRO && elites[e]->lifeTime >= MIN_LIFETIME_FOR_REPRO) {
-                    Player* clone = new Player(elites[e]->genes, DOT_WIDTH, DOT_HEIGHT, elites[e]->color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), elites[e]->parent_id);
-                    clone->biases = elites[e]->biases;
-                    players.push_back(clone);
-                    elite_cloned[e] = true;
-                    cloned = true;
-                    break;
+            // 40% chance: clone an elite
+            if (!elites.empty() && (rand() % 100 < 40)) {
+                int e = rand() % elites.size();
+                Player* clone = new Player(elites[e]->genes, DOT_WIDTH, DOT_HEIGHT, elites[e]->color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), elites[e]->parent_id);
+                clone->biases = elites[e]->biases;
+                players.push_back(clone);
+            } else if (!Player::gene_pool.empty()) {
+                // 30% chance: crossover from gene pool using tournament selection
+                int tournament_size = 5;
+                std::vector<const Player::GeneEntry*> tournament;
+                for (int t = 0; t < tournament_size; ++t) {
+                    int idx = rand() % Player::gene_pool.size();
+                    tournament.push_back(&Player::gene_pool[idx]);
                 }
-            }
-            if (!cloned) {
-                int top_n = 8; // Increase pool for more diversity
-                std::vector<Player*> sorted_alive2;
-                for (auto* p : alive_bots) {
-                    if (p->foodScore >= MIN_FOOD_FOR_REPRO && p->lifeTime >= MIN_LIFETIME_FOR_REPRO) {
-                        sorted_alive2.push_back(p);
-                    }
-                }
-                if (sorted_alive2.empty()) {
-                    // fallback: inject random
-                    std::array<int, 3> color = {rand() % 256, rand() % 256, rand() % 256};
-                    players.push_back(new Player(DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));
-                } else {
-                    std::sort(sorted_alive2.begin(), sorted_alive2.end(), [](Player* a, Player* b) {
-                        return (float(a->foodScore) * float(a->lifeTime)) > (float(b->foodScore) * float(b->lifeTime));
-                    });
-                    Player* parent = sorted_alive2[rand() % std::min(top_n, (int)sorted_alive2.size())];
-                    Player* parent2 = sorted_alive2[rand() % std::min(top_n, (int)sorted_alive2.size())];
-                    int parent_id = std::distance(players.begin(), std::find(players.begin(), players.end(), parent));
-                    std::array<int, 3> color = parent->color;
-                    auto new_genes = crossover(parent->genes, parent2->genes);
-                    mutate_genes(new_genes, 10);
-                    Player* child = new Player(new_genes, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), parent_id);
-                    child->biases = parent->biases;
-                    players.push_back(child);
-                }
+                // Use tournament selection
+                const Player::GeneEntry* parent1 = *std::max_element(tournament.begin(), tournament.end(), [](const Player::GeneEntry* a, const Player::GeneEntry* b) { return a->fitness < b->fitness; });
+                const Player::GeneEntry* parent2 = *std::max_element(tournament.begin(), tournament.end(), [parent1](const Player::GeneEntry* a, const Player::GeneEntry* b) { return (a->fitness < b->fitness) && (a != parent1); });
+                std::array<int, 3> color = {rand() % 256, rand() % 256, rand() % 256};
+                auto new_genes = crossover(parent1->genes, parent2->genes);
+
+                // Adaptive mutation: higher if population is less diverse
+                float mutation_rate = MUTATION_RATE;
+                if (Player::gene_pool.size() < GENE_POOL_SIZE / 2) mutation_rate *= 2.0f;
+                mutate_genes(new_genes, int(10 * mutation_rate));
+                Player* child = new Player(new_genes, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), -1);
+                child->biases = parent1->biases;
+                players.push_back(child);
+            } else {
+                // fallback: inject random
+                std::array<int, 3> color = {rand() % 256, rand() % 256, rand() % 256};
+                players.push_back(new Player(DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));
             }
         }
         alive_bots.push_back(players.back());
     }
+    ++generation;
 }
 
 void Game::update_grids() {

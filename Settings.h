@@ -69,15 +69,16 @@ constexpr std::array<std::tuple<int, int>, 4> NEURAL_NET_SHAPE = {
 
 // This is done after normalization to [-1,1], so the players are more sensitive to environmental changes
 // Can be individually changed to increase/decrease the effect of a feature
-constexpr float SCALE_FOOD_DIST = 50.0f;
-constexpr float SCALE_FOOD_ANGLE = 50.0f;
-constexpr float SCALE_PLAYER_DIST = 30.0f;
-constexpr float SCALE_PLAYER_ANGLE = 30.0f;
-constexpr float SCALE_WALL = 10.0f;
-constexpr float SCALE_SPEED = 10.0f;
-constexpr float SCALE_SIZE_DIFF = 30.0f;
-constexpr float SCALE_OWN_FOOD = 20.0f;
-constexpr float SCALE_OWN_SIZE = 20.0f;
+// Works like a Gain Layer
+constexpr float SCALE_FOOD_DIST = 10.0f;
+constexpr float SCALE_FOOD_ANGLE = 10.0f;
+constexpr float SCALE_PLAYER_DIST = 6.0f;
+constexpr float SCALE_PLAYER_ANGLE = 6.0f;
+constexpr float SCALE_WALL = 1.0f;
+constexpr float SCALE_SPEED = 1.0f;
+constexpr float SCALE_SIZE_DIFF = 6.0f;
+constexpr float SCALE_OWN_FOOD = 4.0f;
+constexpr float SCALE_OWN_SIZE = 4.0f;
 
 // Smoothing factor for temporal smoothing of NN inputs
 // 0 means no change in inputs, 1 means instant change to the new value
@@ -96,3 +97,11 @@ constexpr bool SUPER_PLAYER = true; // add new players from the save file, if ex
 constexpr int GRID_CELL_SIZE = MAX_PLAYER_SIZE / 4;
 
 constexpr bool CACHE_NEARBY_ENTITIES = true;
+
+// Genetic Algorithm Settings
+constexpr int GENE_POOL_SIZE = 100;
+constexpr float ELITISM_PERCENT = 0.1f; // top 10% as elites
+constexpr float MUTATION_RATE = 0.1f; // 10% mutation rate
+constexpr float LARGE_MUTATION_RATE = 0.02f; // 2% large mutation
+constexpr float MIN_FITNESS_FOR_GENE_POOL = 100.0f;
+constexpr int GENE_POOL_PRUNE_INTERVAL = 10; // generations

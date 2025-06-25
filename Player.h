@@ -5,6 +5,7 @@
 #include <SDL.h>
 #include <random>
 #include <memory>
+#include <set>
 class Game;
 
 // Helper struct for NN input and dx/dy values
@@ -88,6 +89,9 @@ public:
     static int size_to_food[MAX_PLAYER_SIZE + 1];
     static void init_lookup_tables();
     static bool lookup_tables_initialized;
+
+    std::set<std::pair<int, int>> visited_cells;
+    void update_exploration_cell(int cell_size, int world_width, int world_height);
 };
 
 // Helper functions for gene crossover and mutation
