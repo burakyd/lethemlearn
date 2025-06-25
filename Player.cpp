@@ -805,4 +805,50 @@ void Player::load_hall_of_fame(const std::string& filename) {
         }
     }
     std::sort(hall_of_fame.begin(), hall_of_fame.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness > b.fitness; });
+}
+
+float Player::adaptive_mutation_rate = MUTATION_RATE;
+
+float Player::genetic_distance(const GeneEntry& a, const GeneEntry& b) {
+    float dist = 0.0f;
+    int count = 0;
+    for (size_t l = 0; l < a.genes.size(); ++l) {
+        for (size_t i = 0; i < a.genes[l].size(); ++i) {
+            dist += std::abs(a.genes[l][i] - b.genes[l][i]);
+            ++count;
+        }
+        for (size_t i = 0; i < a.biases[l].size(); ++i) {
+            dist += std::abs(a.biases[l][i] - b.biases[l][i]);
+            ++count;
+        }
+    }
+    return dist / count;
+}
+
+void Player::prune_gene_pool_diversity(int max_size, float min_distance) {
+    if ((int)gene_pool.size() <= max_size) return;
+    // Sort by fitness descending
+    std::sort(gene_pool.begin(), gene_pool.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness > b.fitness; });
+    std::vector<GeneEntry> new_pool;
+    for (const auto& entry : gene_pool) {
+        bool too_close = false;
+        for (const auto& kept : new_pool) {
+            if (genetic_distance(entry, kept) < min_distance) {
+                too_close = true;
+                break;
+            }
+        }
+        if (!too_close) new_pool.push_back(entry);
+        if ((int)new_pool.size() >= max_size) break;
+    }
+    // If not enough, fill with next best regardless of diversity
+    for (const auto& entry : gene_pool) {
+        if ((int)new_pool.size() >= max_size) break;
+        bool already = false;
+        for (const auto& kept : new_pool) {
+            if (&entry == &kept) { already = true; break; }
+        }
+        if (!already) new_pool.push_back(entry);
+    }
+    gene_pool = new_pool;
 } 

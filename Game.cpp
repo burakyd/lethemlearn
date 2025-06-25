@@ -213,6 +213,10 @@ void Game::randomFood(int num) {
 // Maintains population, gene pool, elitism, crossover and other mechanisms of Genetic Algorithm
 void Game::maintain_population() {
     static int generation = 0;
+    static float best_fitness = 0.0f;
+    static int generations_since_improvement = 0;
+    static constexpr int ADAPTIVE_MUTATION_PATIENCE = 20;
+    static constexpr float ADAPTIVE_MUTATION_FACTOR = 2.0f;
     // fitness calculation lambda
     auto calc_fitness = [this](Player* p, float w_food, float w_life, float w_dist, float w_size, float w_explore, float min_food, float min_life, float early_death_time, float early_death_penalty) {
         float exploration_bonus = w_explore * p->visited_cells.size();
@@ -267,10 +271,24 @@ void Game::maintain_population() {
     }
     int clones_added = 0;
     std::vector<bool> elite_cloned(n_elites, false);
-    // Prune gene pool every GENE_POOL_PRUNE_INTERVAL generations
+    // Prune gene pool every GENE_POOL_PRUNE_INTERVAL generations (diversity-based)
     if (generation % GENE_POOL_PRUNE_INTERVAL == 0 && Player::gene_pool.size() > GENE_POOL_SIZE) {
-        std::sort(Player::gene_pool.begin(), Player::gene_pool.end(), [](const Player::GeneEntry& a, const Player::GeneEntry& b) { return a.fitness > b.fitness; });
-        Player::gene_pool.resize(GENE_POOL_SIZE);
+        Player::prune_gene_pool_diversity(GENE_POOL_SIZE, 0.2f);
+    }
+    // Adaptive mutation: increase if no improvement
+    float current_best = 0.0f;
+    for (const auto& entry : Player::gene_pool) {
+        if (entry.fitness > current_best) current_best = entry.fitness;
+    }
+    if (current_best > best_fitness) {
+        best_fitness = current_best;
+        generations_since_improvement = 0;
+        Player::adaptive_mutation_rate = MUTATION_RATE;
+    } else {
+        generations_since_improvement++;
+        if (generations_since_improvement > ADAPTIVE_MUTATION_PATIENCE) {
+            Player::adaptive_mutation_rate = MUTATION_RATE * ADAPTIVE_MUTATION_FACTOR;
+        }
     }
     // Fill up population
     while (alive_bots.size() < MIN_BOT) {
@@ -318,7 +336,7 @@ void Game::maintain_population() {
                     auto new_genes = crossover(parent1->genes, parent2->genes);
                     auto new_biases = crossover_biases(parent1->biases, parent2->biases);
                     // Adaptive mutation: higher if population is less diverse
-                    float mutation_rate = MUTATION_RATE;
+                    float mutation_rate = Player::adaptive_mutation_rate;
                     if (Player::gene_pool.size() < GENE_POOL_SIZE / 2) mutation_rate *= 2.0f;
                     mutate_genes(new_genes, int(10 * mutation_rate));
                     mutate_biases(new_biases, int(10 * mutation_rate));

@@ -101,6 +101,12 @@ public:
     static GeneEntry sample_hall_of_fame();
     static void save_hall_of_fame(const std::string& filename = "hall_of_fame.txt");
     static void load_hall_of_fame(const std::string& filename = "hall_of_fame.txt");
+
+    // Diversity-based gene pool pruning
+    static float genetic_distance(const GeneEntry& a, const GeneEntry& b);
+    static void prune_gene_pool_diversity(int max_size, float min_distance = 0.2f);
+    // Adaptive mutation rate
+    static float adaptive_mutation_rate;
 };
 
 // Helper functions for gene crossover and mutation
