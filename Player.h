@@ -99,6 +99,8 @@ public:
     static constexpr int HALL_OF_FAME_SIZE = 10;
     static void update_hall_of_fame(float fitness, const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases);
     static GeneEntry sample_hall_of_fame();
+    static void save_hall_of_fame(const std::string& filename = "hall_of_fame.txt");
+    static void load_hall_of_fame(const std::string& filename = "hall_of_fame.txt");
 };
 
 // Helper functions for gene crossover and mutation
