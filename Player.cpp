@@ -30,9 +30,9 @@ Player::Player(int width, int height, std::array<int, 3> color, float x, float y
         int in = layer_sizes[i], out = layer_sizes[i+1];
         std::vector<float> layer(in * out);
         std::vector<float> bias(out);
-        float scale = std::sqrt(2.0f / (in + out));
-        std::generate(layer.begin(), layer.end(), [&]() { return scale * ((float)rand() / RAND_MAX * 2 - 1); });
-        std::generate(bias.begin(), bias.end(), [&]() { return scale * ((float)rand() / RAND_MAX * 2 - 1); });
+        float a = std::sqrt(6.0f / (in + out));
+        std::generate(layer.begin(), layer.end(), [&]() { return ((float)rand() / RAND_MAX * 2 - 1) * a; });
+        std::fill(bias.begin(), bias.end(), 0.0f);
         genes.push_back(layer);
         biases.push_back(bias);
     }
@@ -60,7 +60,7 @@ Player::Player(const std::vector<std::vector<float>>& parent_genes, int width, i
 }
 
 void Player::initialize_weights_xavier() {
-    // Re-initialize genes with Xavier
+    // Re-initialize genes with Xavier/Glorot uniform
     std::vector<int> layer_sizes = {NN_INPUTS, NN_H1, NN_H2, NN_H3, NN_OUTPUTS};
     genes.clear();
     biases.clear();
@@ -68,9 +68,9 @@ void Player::initialize_weights_xavier() {
         int in = layer_sizes[i], out = layer_sizes[i+1];
         std::vector<float> layer(in * out);
         std::vector<float> bias(out);
-        float scale = std::sqrt(2.0f / (in + out));
-        std::generate(layer.begin(), layer.end(), [&]() { return scale * ((float)rand() / RAND_MAX * 2 - 1); });
-        std::generate(bias.begin(), bias.end(), [&]() { return scale * ((float)rand() / RAND_MAX * 2 - 1); });
+        float a = std::sqrt(6.0f / (in + out));
+        std::generate(layer.begin(), layer.end(), [&]() { return ((float)rand() / RAND_MAX * 2 - 1) * a; });
+        std::fill(bias.begin(), bias.end(), 0.0f);
         genes.push_back(layer);
         biases.push_back(bias);
     }
@@ -253,15 +253,19 @@ NNInputsResult Player::get_nn_inputs(const Game& game) {
     float rel_food_angle_scaled = rel_food_angle / M_PI; // [-1, 1]
 
     // 2: Distance and relative angle to nearest player (not self)
+    // calculate from edges so that a bigger player wont be seen as more far than it is
     float min_player_dist = 1e6f, player_dx = 0, player_dy = 0;
     int nearest_player_width = DOT_WIDTH;
     for (auto* p : game.players) {
         if (p == this || !p->alive) continue;
         float dx = p->x - x;
         float dy = p->y - y;
-        float dist = std::sqrt(dx*dx + dy*dy);
-        if (dist < min_player_dist) {
-            min_player_dist = dist;
+        float center_dist = std::sqrt(dx*dx + dy*dy);
+        float r_self = (width + height) / 4.0f;
+        float r_other = (p->width + p->height) / 4.0f;
+        float edge_dist = center_dist - r_self - r_other;
+        if (edge_dist < min_player_dist) {
+            min_player_dist = edge_dist;
             player_dx = dx;
             player_dy = dy;
             nearest_player_width = p->width;
@@ -374,7 +378,10 @@ void Player::update(Game& game) {
     if (killTime >= KILL_TIME) {
         killTime = 0;
         if (foodCount > 0) {
-            decrease_size_step();
+            int food_loss = std::ceil(1 + 0.05 * std::sqrt(width));
+            for (int i = 0; i < food_loss && foodCount > 0; ++i) {
+                decrease_size_step();
+            }
         } else if (KILL) {
             alive = false;
         }
@@ -594,7 +601,10 @@ void HumanPlayer::update(Game& game) {
     if (killTime >= KILL_TIME) {
         killTime = 0;
         if (foodCount > 0) {
-            decrease_size_step();
+            int food_loss = std::ceil(1 + 0.05 * std::sqrt(width));
+            for (int i = 0; i < food_loss && foodCount > 0; ++i) {
+                decrease_size_step();
+            }
         } else if (KILL) {
             alive = false;
         }

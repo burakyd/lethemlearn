@@ -33,13 +33,13 @@ constexpr int EATEN_ADD = 0; // additional reward for eating a player
 
 // Game Mechanics
 constexpr int KILL_TIME = 500;
-constexpr int NUMBER_OF_FOODS = 25;
+constexpr int NUMBER_OF_FOODS = 40;
 constexpr int BOTS = 50;
 constexpr int HUNTERS = 5;
-constexpr int HUNTER_WIDTH = 25;
-constexpr int HUNTER_HEIGHT = 25;
+constexpr int HUNTER_WIDTH = 30;
+constexpr int HUNTER_HEIGHT = 30;
 constexpr std::array<int, 3> HUNTER_COLOR = RED;
-constexpr int MIN_BOT = 25;
+constexpr int MIN_BOT = 30;
 constexpr bool ADD_NEW_WHEN_DIE = true;
 constexpr bool KILL = true;
 
