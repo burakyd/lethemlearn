@@ -27,4 +27,14 @@ public:
     SDL_Renderer* renderer;
     bool inLocation(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2);
     // Add more as needed
+
+    // --- Spatial Partitioning ---
+    static constexpr int CELL_SIZE = GRID_CELL_SIZE;
+    static constexpr int GRID_WIDTH = (SCREEN_WIDTH + CELL_SIZE - 1) / CELL_SIZE;
+    static constexpr int GRID_HEIGHT = (SCREEN_HEIGHT + CELL_SIZE - 1) / CELL_SIZE;
+    std::vector<Player*> player_grid[GRID_WIDTH][GRID_HEIGHT];
+    std::vector<Food*> food_grid[GRID_WIDTH][GRID_HEIGHT];
+    void update_grids();
+    std::vector<Player*> get_nearby_players(float x, float y);
+    std::vector<Food*> get_nearby_food(float x, float y);
 }; 

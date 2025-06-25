@@ -24,6 +24,7 @@ constexpr std::array<int, 3> DOT_COLOR = GREEN;
 constexpr float MAX_SPEED = 2.0f; // max speed of the players
 constexpr int MAX_PLAYER_SIZE = 10 * DOT_WIDTH; // max player size
 
+
 // Food Settings
 constexpr int FOOD_WIDTH = 5;
 constexpr int FOOD_HEIGHT = 5;
@@ -43,7 +44,7 @@ constexpr bool ADD_NEW_WHEN_DIE = true;
 constexpr bool KILL = true;
 
 // Player Controls - for fun
-constexpr bool PLAYER_ENABLED = true; // not truly implemented yet
+constexpr bool PLAYER_ENABLED = true;
 
 // Evolution Settings
 constexpr int MITOSIS = 15000; // 1/MITOSIS chance of mitosis
@@ -90,7 +91,8 @@ constexpr float NN_INPUT_SMOOTHING_ALPHA = 0.2f;
 constexpr int SAVE_GENES = 20;
 constexpr bool SUPER_PLAYER = true; // add new players from the save file, if exists
 
-// Performance Settings
-constexpr bool SPATIAL_PARTITIONING = true;
-constexpr int OPTIMIZATION_LEVEL = 2;
+// Spatial Partitioning
+// Important for scaling for more than 50-100 players
+constexpr int GRID_CELL_SIZE = MAX_PLAYER_SIZE / 4;
+
 constexpr bool CACHE_NEARBY_ENTITIES = true;

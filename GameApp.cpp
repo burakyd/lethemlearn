@@ -6,6 +6,8 @@
 #include <iostream>
 #include <algorithm>
 #include <map>
+#include <iomanip>
+#include <sstream>
 
 extern int game_time_units;
 
@@ -138,6 +140,7 @@ void GameApp::run() {
             }
             if (e.type == SDL_KEYDOWN) {
                 if (paused) {
+                    // check keys for paused state - settings
                     switch (e.key.keysym.sym) {
                         case SDLK_b:
                             pending_bot_count = std::max(1, pending_bot_count - 1);
@@ -163,15 +166,24 @@ void GameApp::run() {
                         case SDLK_p:
                             pending_player_enabled = !pending_player_enabled;
                             break;
-                        case SDLK_ESCAPE:
-                            g_bot_count = pending_bot_count;
-                            g_food_count = pending_food_count;
-                            g_hunters_enabled = pending_hunters_enabled;
-                            g_hunter_count = pending_hunter_count;
-                            g_player_enabled = pending_player_enabled;
-                            restart_simulation();
+                        case SDLK_ESCAPE: {
+                            // Only Restart if a setting is changed
+                            bool changed = (g_bot_count != pending_bot_count ||
+                                            g_food_count != pending_food_count ||
+                                            g_hunters_enabled != pending_hunters_enabled ||
+                                            g_hunter_count != pending_hunter_count ||
+                                            g_player_enabled != pending_player_enabled);
+                            if (changed) {
+                                g_bot_count = pending_bot_count;
+                                g_food_count = pending_food_count;
+                                g_hunters_enabled = pending_hunters_enabled;
+                                g_hunter_count = pending_hunter_count;
+                                g_player_enabled = pending_player_enabled;
+                                restart_simulation();
+                            }
                             paused = false;
                             break;
+                        }
                         case SDLK_r:
                             restart_simulation();
                             break;
@@ -253,42 +265,22 @@ void GameApp::run() {
             SDL_Color cyan = {0,255,255,255};
             int y = 20;
             int alive_players = 0, total_food = game->foods.size(), total_hunters = game->hunters.size();
-            int best_score = 0, sum_score = 0, min_score = 1e6;
-            Player* best_bot = nullptr;
             int best_bot_id = -1;
             int best_bot_lifetime = 0;
             int player_index = 0;
             for (auto* p : game->players) {
                 if (p->alive) {
                     ++alive_players;
-                    sum_score += p->foodScore;
-                    if (p->foodScore > best_score) {
-                        best_score = p->foodScore;
-                        best_bot = p;
-                        best_bot_id = player_index;
-                        best_bot_lifetime = p->lifeTime;
-                    }
-                    if (p->foodScore < min_score) min_score = p->foodScore;
+                    best_bot_id = player_index;
+                    best_bot_lifetime = p->lifeTime;
                 }
                 player_index++;
             }
-            float avg_score = alive_players > 0 ? float(sum_score) / alive_players : 0.0f;
             int sidebar_x = SCREEN_WIDTH + 20;
             renderText(renderer, font, "     --- STATS ---", sidebar_x, y, green); y += 35;
             renderText(renderer, font, "Bots Alive: " + std::to_string(alive_players) + " / " + std::to_string(g_bot_count), sidebar_x, y, white); y += 28;
             renderText(renderer, font, "Hunters:   " + std::string(g_hunters_enabled ? "[X] " : "[ ] ") + std::to_string(total_hunters) + " / " + std::to_string(g_hunter_count), sidebar_x, y, white); y += 28;
             renderText(renderer, font, "Food:      " + std::to_string(total_food) + " / " + std::to_string(g_food_count), sidebar_x, y, white); y += 28;
-            renderText(renderer, font, "Best Score: " + std::to_string(best_score), sidebar_x, y, yellow); y += 28;
-            renderText(renderer, font, "Avg Score:  " + std::to_string(int(avg_score)), sidebar_x, y, cyan); y += 28;
-            renderText(renderer, font, "Min Score:  " + std::to_string(min_score), sidebar_x, y, white); y += 28;
-            if (best_bot) {
-                renderText(renderer, font, "Best Bot:   #" + std::to_string(best_bot_id), sidebar_x, y, yellow); y += 22;
-                SDL_Rect color_rect = {SCREEN_WIDTH + 20, y, 40, 20};
-                SDL_SetRenderDrawColor(renderer, best_bot->color[0], best_bot->color[1], best_bot->color[2], 255);
-                SDL_RenderFillRect(renderer, &color_rect);
-                y += 22;
-                renderText(renderer, font, "Lifetime:   " + std::to_string(best_bot_lifetime), sidebar_x, y, white); y += 28;
-            }
             Uint32 elapsed_ms = SDL_GetTicks() - sim_start_time;
             int seconds = elapsed_ms / 1000;
             int minutes = seconds / 60;
@@ -306,11 +298,7 @@ void GameApp::run() {
                 while (SDL_PollEvent(&logic_event)) {
                     if (logic_event.type == SDL_QUIT) quit = true;
                     if (logic_event.type == SDL_KEYDOWN) {
-                        if (logic_event.key.keysym.sym == SDLK_UP) {
-                            speed_index = std::min((int)speed_steps.size() - 2, speed_index + 1);
-                            sim_speed = speed_steps[speed_index];
-                            logic_max_mode = false;
-                        } else if (logic_event.key.keysym.sym == SDLK_DOWN) {
+                        if (logic_event.key.keysym.sym == SDLK_DOWN) {
                             speed_index = std::max(0, speed_index - 1);
                             sim_speed = speed_steps[speed_index];
                             logic_max_mode = false;
@@ -358,29 +346,13 @@ void GameApp::run() {
         SDL_Color cyan = {0,255,255,255};
         int y = 20;
         int alive_players = 0, total_food = game->foods.size(), total_hunters = game->hunters.size();
-        int best_score = 0, sum_score = 0, min_score = 1e6;
-        Player* best_bot = nullptr;
-        int best_bot_id = -1;
-        int best_bot_lifetime = 0;
-        float best_bot_size = 0.0f, avg_size = 0.0f;
         int player_index = 0;
         for (auto* p : game->players) {
             if (p->alive) {
                 ++alive_players;
-                sum_score += p->foodScore;
-                avg_size += p->width;
-                if (p->foodScore > best_score) {
-                    best_score = p->foodScore;
-                    best_bot = p;
-                    best_bot_id = player_index;
-                    best_bot_lifetime = p->lifeTime;
-                    best_bot_size = p->width;
-                }
-                if (p->foodScore < min_score) min_score = p->foodScore;
             }
             player_index++;
         }
-        avg_size = alive_players > 0 ? avg_size / alive_players : 0.0f;
         int sidebar_x = SCREEN_WIDTH + 20;
         auto setup_sidebar_buttons = [&](int sidebar_x, int y_start) {
             sidebar_buttons.clear();
@@ -422,19 +394,6 @@ void GameApp::run() {
         renderText(renderer, font, "Bots Alive: " + std::to_string(alive_players) + " / " + std::to_string(g_bot_count), sidebar_x, y, white); y += 28;
         renderText(renderer, font, "Hunters:   " + std::string(g_hunters_enabled ? "[X] " : "[ ] ") + std::to_string(total_hunters) + " / " + std::to_string(g_hunter_count), sidebar_x, y, white); y += 28;
         renderText(renderer, font, "Food:      " + std::to_string(total_food) + " / " + std::to_string(g_food_count), sidebar_x, y, white); y += 28;
-        renderText(renderer, font, "Best Score: " + std::to_string(best_score), sidebar_x, y, yellow); y += 28;
-        renderText(renderer, font, "Avg Score:  " + std::to_string(int(alive_players > 0 ? float(sum_score) / alive_players : 0.0f)), sidebar_x, y, cyan); y += 28;
-        renderText(renderer, font, "Min Score:  " + std::to_string(min_score), sidebar_x, y, white); y += 28;
-        if (best_bot) {
-            renderText(renderer, font, "Best Bot:   #" + std::to_string(best_bot_id), sidebar_x, y, yellow); y += 22;
-            SDL_Rect color_rect = {SCREEN_WIDTH + 20, y, 40, 20};
-            SDL_SetRenderDrawColor(renderer, best_bot->color[0], best_bot->color[1], best_bot->color[2], 255);
-            SDL_RenderFillRect(renderer, &color_rect);
-            y += 22;
-            renderText(renderer, font, "Lifetime:   " + std::to_string(best_bot_lifetime), sidebar_x, y, white); y += 28;
-            renderText(renderer, font, "Size:       " + std::to_string(int(best_bot_size)), sidebar_x, y, cyan); y += 28;
-        }
-        renderText(renderer, font, "Avg Size:   " + std::to_string(int(avg_size)), sidebar_x, y, cyan); y += 28;
         Uint32 elapsed_ms = SDL_GetTicks() - sim_start_time;
         int seconds = elapsed_ms / 1000;
         int minutes = seconds / 60;
@@ -463,6 +422,52 @@ void GameApp::run() {
             renderText(renderer, font, "Speed (UP/DOWN):", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, speed_str, SCREEN_WIDTH/2 + 100, sy, cyan); sy += 32;
             renderText(renderer, font, "ESC: Apply & Resume", SCREEN_WIDTH/2 - 80, sy + 32, cyan);
             renderText(renderer, font, "R: Restart", SCREEN_WIDTH/2 - 80, sy + 64, yellow);
+        }
+        // Find best 3 bots and human player
+        std::vector<std::pair<Player*, int>> bot_stats; // (player, index)
+        Player* human_player = nullptr;
+        int idx = 0;
+        for (auto* p : game->players) {
+            if (p->alive) {
+                if (p->is_human) {
+                    human_player = p;
+                } else {
+                    bot_stats.emplace_back(p, idx);
+                }
+            }
+            ++idx;
+        }
+        // Sort bots by foodCount descending
+        std::sort(bot_stats.begin(), bot_stats.end(), [](const auto& a, const auto& b) {
+            return a.first->foodCount > b.first->foodCount;
+        });
+        // Show best 3 bots stats with column headers and compact rows
+        y += 10;
+        renderText(renderer, font, "Top Bots:", sidebar_x, y, yellow); y += 18;
+        // Column headers
+        renderText(renderer, font, "  S    F   L(k)", sidebar_x + 24, y, cyan); y += 16;
+        for (int i = 0; i < std::min(5, (int)bot_stats.size()); ++i) {
+            y += 10;
+            Player* bot = bot_stats[i].first;
+            SDL_Rect color_rect = {sidebar_x, y, 14, 14};
+            SDL_SetRenderDrawColor(renderer, bot->color[0], bot->color[1], bot->color[2], 255);
+            SDL_RenderFillRect(renderer, &color_rect); y -= 4; // for a better look
+            // Only show values, not labels or bot number
+            std::ostringstream oss;
+            oss << std::setw(4) << std::setfill(' ') << bot->width << " "
+                << std::setw(3) << std::setfill(' ') << bot->foodCount << " "
+                << std::setw(4) << std::fixed << std::setprecision(1) << (bot->lifeTime / 1000.0f);
+            renderText(renderer, font, oss.str(), sidebar_x + 24, y, white); y += 15;
+        }
+        // Show human player stats
+        if (g_player_enabled && human_player) {
+            y += 8;
+            renderText(renderer, font, "Human Player:", sidebar_x, y, cyan); y += 20;
+            SDL_Rect color_rect = {sidebar_x, y, 18, 18};
+            SDL_SetRenderDrawColor(renderer, human_player->color[0], human_player->color[1], human_player->color[2], 255);
+            SDL_RenderFillRect(renderer, &color_rect);
+            std::string hp_info = "S:" + std::to_string(human_player->width) + " F:" + std::to_string(human_player->foodCount);
+            renderText(renderer, font, hp_info, sidebar_x + 24, y, white); y += 20;
         }
         SDL_RenderPresent(renderer);
     }

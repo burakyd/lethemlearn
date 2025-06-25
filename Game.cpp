@@ -16,7 +16,7 @@
 int game_time_units = 0;
 
 // Add grid cell size for partitioning
-constexpr int GRID_SIZE = 64;
+constexpr int GRID_SIZE = GRID_CELL_SIZE;
 using GridCell = std::vector<Player*>;
 using FoodCell = std::vector<Food*>;
 
@@ -81,7 +81,7 @@ Game::Game(SDL_Renderer* renderer) : renderer(renderer) {
 
 void Game::update() {
     game_time_units++;
-    update_grids(*this);
+    update_grids();
     for (auto* p : players) if (p) p->update(*this);
     for (auto* h : hunters) if (h) h->update(*this);
     for (auto* f : foods) if (f) f->update(*this);
@@ -319,4 +319,61 @@ void Game::maintain_population() {
         }
         alive_bots.push_back(players.back());
     }
+}
+
+void Game::update_grids() {
+    // Clear grids
+    for (int x = 0; x < GRID_WIDTH; ++x)
+        for (int y = 0; y < GRID_HEIGHT; ++y) {
+            player_grid[x][y].clear();
+            food_grid[x][y].clear();
+        }
+    // Assign players
+    for (Player* p : players) {
+        int gx = int(p->x) / CELL_SIZE;
+        int gy = int(p->y) / CELL_SIZE;
+        if (gx >= 0 && gx < GRID_WIDTH && gy >= 0 && gy < GRID_HEIGHT)
+            player_grid[gx][gy].push_back(p);
+    }
+    // Assign food
+    for (Food* f : foods) {
+        int gx = int(f->x) / CELL_SIZE;
+        int gy = int(f->y) / CELL_SIZE;
+        if (gx >= 0 && gx < GRID_WIDTH && gy >= 0 && gy < GRID_HEIGHT)
+            food_grid[gx][gy].push_back(f);
+    }
+}
+
+std::vector<Player*> Game::get_nearby_players(float x, float y) {
+    std::vector<Player*> result;
+    int gx = int(x) / CELL_SIZE;
+    int gy = int(y) / CELL_SIZE;
+    for (int dx = -1; dx <= 1; ++dx) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            int nx = gx + dx, ny = gy + dy;
+            if (nx >= 0 && nx < GRID_WIDTH && ny >= 0 && ny < GRID_HEIGHT) {
+                for (Player* p : player_grid[nx][ny]) {
+                    result.push_back(p);
+                }
+            }
+        }
+    }
+    return result;
+}
+
+std::vector<Food*> Game::get_nearby_food(float x, float y) {
+    std::vector<Food*> result;
+    int gx = int(x) / CELL_SIZE;
+    int gy = int(y) / CELL_SIZE;
+    for (int dx = -1; dx <= 1; ++dx) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            int nx = gx + dx, ny = gy + dy;
+            if (nx >= 0 && nx < GRID_WIDTH && ny >= 0 && ny < GRID_HEIGHT) {
+                for (Food* f : food_grid[nx][ny]) {
+                    result.push_back(f);
+                }
+            }
+        }
+    }
+    return result;
 } 

@@ -13,8 +13,6 @@
 #include <SDL.h>
 class Food;
 class Player;
-extern std::vector<Food*> get_nearby_food(float x, float y);
-extern std::vector<Player*> get_nearby_players(float x, float y);
 
 namespace {
     float leaky_relu(float x) { return x > 0.0f ? x : 0.01f * x; }
@@ -208,7 +206,7 @@ bool Player::eatPlayer(Game& game, Player& other) {
 }
 
 bool Player::eatFood(Game& game) {
-    auto foods = get_nearby_food(x, y);
+    auto foods = game.get_nearby_food(x, y);
     for (auto* food : foods) {
         float dx = x - food->x;
         float dy = y - food->y;
@@ -407,7 +405,7 @@ void Player::update(Game& game) {
     distance_traveled += std::sqrt((x - old_x) * (x - old_x) + (y - old_y) * (y - old_y));
     clamp_to_screen(game);
     eatFood(game);
-    auto nearby_players = get_nearby_players(x, y);
+    auto nearby_players = game.get_nearby_players(x, y);
     for (auto* other : nearby_players) {
         if (other->alive && other != this) {
             eatPlayer(game, *other);
@@ -630,7 +628,7 @@ void HumanPlayer::update(Game& game) {
     }
     clamp_to_screen(game);
     eatFood(game);
-    auto nearby_players = get_nearby_players(x, y);
+    auto nearby_players = game.get_nearby_players(x, y);
     for (auto* other : nearby_players) {
         if (other->alive && other != this) {
             eatPlayer(game, *other);
