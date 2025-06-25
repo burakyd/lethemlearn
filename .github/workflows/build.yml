@@ -27,7 +27,6 @@ jobs:
       run: |
         brew update
         brew install cmake sdl2 sdl2_ttf
-        echo "PKG_CONFIG_PATH=$(brew --prefix sdl2)/lib/pkgconfig:$(brew --prefix sdl2_ttf)/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
     - name: Install dependencies (Windows)
       if: runner.os == 'Windows'
@@ -36,9 +35,20 @@ jobs:
         choco install sdl2 sdl2-ttf -y
 
     - name: Configure CMake
-      run: cmake -S . -B build
-      env:
-        PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
+      if: runner.os == 'macOS'
+      run: |
+        brew_prefix=$(brew --prefix)
+        cmake -S . -B build \
+          -DCMAKE_PREFIX_PATH="$brew_prefix/opt/sdl2;$brew_prefix/opt/sdl2_ttf" \
+          -DCMAKE_BUILD_TYPE=Release
+
+    - name: Configure CMake
+      if: runner.os != 'macOS'
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Check CMake cache (macOS)
+      if: runner.os == 'macOS'
+      run: cat build/CMakeCache.txt | grep TTF
 
     - name: Build
       run: cmake --build build --config Release
