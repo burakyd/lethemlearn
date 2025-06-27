@@ -317,13 +317,14 @@ void Game::maintain_population() {
     // Fill up population
     while (alive_bots.size() < MIN_BOT) {
         // 5% chance: insert Hall of Fame agent
-        if (!Player::hall_of_fame.empty() && (rand() % 100 < 5)) {
-            auto hof = Player::sample_hall_of_fame();
-            SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
-            auto [genes, biases] = random_genes_and_biases();
-            Player* hof_agent = new Player(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), -1);
-            players.push_back(hof_agent);
-        } else if ((rand() % 100 < 30) || alive_bots.empty()) {
+        // if (!Player::hall_of_fame.empty() && (rand() % 100 < 5)) {
+        //     auto hof = Player::sample_hall_of_fame();
+        //     SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+        //     auto [genes, biases] = random_genes_and_biases();
+        //     Player* hof_agent = new Player(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), -1);
+        //     players.push_back(hof_agent);
+        // } else 
+        if ((rand() % 100 < 30) || alive_bots.empty()) {
             SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
             auto [genes, biases] = random_genes_and_biases();
             players.push_back(new Player(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));

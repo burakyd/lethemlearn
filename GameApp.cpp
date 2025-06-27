@@ -25,31 +25,33 @@ GameApp::GameApp(bool headless, const std::string& gene_pool_file, int island_id
 GameApp::~GameApp() {}
 
 bool GameApp::init() {
-    // Print essential configuration values from Settings.h (ASCII formatting)
-    const char* hline = "-----------------------------------------------------------------------------------------------------------------------------------------------";
-    std::cout << "\n+" << hline << "+\n";
-    std::cout << "|" << std::setw(80) << std::left << " Simulation Configuration " << hline + 80 << "|\n";
-    auto print_section = [](const std::string& title) {
-        std::cout << "|\n|  " << std::left << std::setw(30) << title << std::setw(110 - title.size()) << " " << "|\n";
-    };
-    auto print_kv = [](const std::string& key, auto value) {
-        std::cout << "|    " << std::left << std::setw(36) << key << ": " << std::setw(12) << value << "|\n";
-    };
-    print_section("[Display]");
-    print_kv("SCREEN_WIDTH", SCREEN_WIDTH); print_kv("SCREEN_HEIGHT", SCREEN_HEIGHT); print_kv("SPEED", SPEED);
-    print_section("[Player]");
-    print_kv("DOT_WIDTH", DOT_WIDTH); print_kv("DOT_HEIGHT", DOT_HEIGHT); print_kv("RANDOM_SIZE_MIN", RANDOM_SIZE_MIN); print_kv("RANDOM_SIZE_MAX", RANDOM_SIZE_MAX);
-    print_kv("MAX_SPEED", MAX_SPEED); print_kv("MAX_PLAYER_SIZE", MAX_PLAYER_SIZE);
-    print_kv("PLAYER_MIN_SPEED_FACTOR", PLAYER_MIN_SPEED_FACTOR); print_kv("PLAYER_SIZE_SPEED_EXPONENT", PLAYER_SIZE_SPEED_EXPONENT); print_kv("PLAYER_GROWTH_EXPONENT", PLAYER_GROWTH_EXPONENT);
-    print_section("[Food]");
-    print_kv("FOOD_WIDTH", FOOD_WIDTH); print_kv("FOOD_HEIGHT", FOOD_HEIGHT); print_kv("FOOD_APPEND", FOOD_APPEND);
-    print_section("[Fitness]");
-    print_kv("FITNESS_WEIGHT_FOOD", FITNESS_WEIGHT_FOOD); print_kv("FITNESS_WEIGHT_LIFE", FITNESS_WEIGHT_LIFE);
-    print_kv("FITNESS_WEIGHT_EXPLORE", FITNESS_WEIGHT_EXPLORE); print_kv("FITNESS_WEIGHT_PLAYERS", FITNESS_WEIGHT_PLAYERS);
-    print_kv("FITNESS_MIN_FOOD", FITNESS_MIN_FOOD); print_kv("FITNESS_MIN_LIFE", FITNESS_MIN_LIFE); print_kv("FITNESS_EARLY_DEATH_TIME", FITNESS_EARLY_DEATH_TIME); print_kv("FITNESS_EARLY_DEATH_PENALTY", FITNESS_EARLY_DEATH_PENALTY);
-    print_kv("FITNESS_MIN_FOR_REPRO", FITNESS_MIN_FOR_REPRO); print_kv("FITNESS_MIN_LIFETIME_FOR_REPRO", FITNESS_MIN_LIFETIME_FOR_REPRO);
-    print_kv("FITNESS_DIVERSITY_PRUNE_MIN_DIST", FITNESS_DIVERSITY_PRUNE_MIN_DIST); print_kv("MIN_FITNESS_FOR_GENE_POOL", MIN_FITNESS_FOR_GENE_POOL);
-    std::cout << "+" << hline << "+\n\n";
+    // Print essential configuration values from Settings.h if not --headless
+    if (!headless) {
+        const char* hline = "-----------------------------------------------------------------------------------------------------------------------------------------------";
+        std::cout << "\n+" << hline << "+\n";
+        std::cout << "|" << std::setw(80) << std::left << " Simulation Configuration " << hline + 80 << "|\n";
+        auto print_section = [](const std::string& title) {
+            std::cout << "|\n|  " << std::left << std::setw(30) << title << std::setw(110 - title.size()) << " " << "|\n";
+        };
+        auto print_kv = [](const std::string& key, auto value) {
+            std::cout << "|    " << std::left << std::setw(36) << key << ": " << std::setw(12) << value << "|\n";
+        };
+        print_section("[Display]");
+        print_kv("SCREEN_WIDTH", SCREEN_WIDTH); print_kv("SCREEN_HEIGHT", SCREEN_HEIGHT); print_kv("SPEED", SPEED);
+        print_section("[Player]");
+        print_kv("DOT_WIDTH", DOT_WIDTH); print_kv("DOT_HEIGHT", DOT_HEIGHT); print_kv("RANDOM_SIZE_MIN", RANDOM_SIZE_MIN); print_kv("RANDOM_SIZE_MAX", RANDOM_SIZE_MAX);
+        print_kv("MAX_SPEED", MAX_SPEED); print_kv("MAX_PLAYER_SIZE", MAX_PLAYER_SIZE);
+        print_kv("PLAYER_MIN_SPEED_FACTOR", PLAYER_MIN_SPEED_FACTOR); print_kv("PLAYER_SIZE_SPEED_EXPONENT", PLAYER_SIZE_SPEED_EXPONENT); print_kv("PLAYER_GROWTH_EXPONENT", PLAYER_GROWTH_EXPONENT);
+        print_section("[Food]");
+        print_kv("FOOD_WIDTH", FOOD_WIDTH); print_kv("FOOD_HEIGHT", FOOD_HEIGHT); print_kv("FOOD_APPEND", FOOD_APPEND);
+        print_section("[Fitness]");
+        print_kv("FITNESS_WEIGHT_FOOD", FITNESS_WEIGHT_FOOD); print_kv("FITNESS_WEIGHT_LIFE", FITNESS_WEIGHT_LIFE);
+        print_kv("FITNESS_WEIGHT_EXPLORE", FITNESS_WEIGHT_EXPLORE); print_kv("FITNESS_WEIGHT_PLAYERS", FITNESS_WEIGHT_PLAYERS);
+        print_kv("FITNESS_MIN_FOOD", FITNESS_MIN_FOOD); print_kv("FITNESS_MIN_LIFE", FITNESS_MIN_LIFE); print_kv("FITNESS_EARLY_DEATH_TIME", FITNESS_EARLY_DEATH_TIME); print_kv("FITNESS_EARLY_DEATH_PENALTY", FITNESS_EARLY_DEATH_PENALTY);
+        print_kv("FITNESS_MIN_FOR_REPRO", FITNESS_MIN_FOR_REPRO); print_kv("FITNESS_MIN_LIFETIME_FOR_REPRO", FITNESS_MIN_LIFETIME_FOR_REPRO);
+        print_kv("FITNESS_DIVERSITY_PRUNE_MIN_DIST", FITNESS_DIVERSITY_PRUNE_MIN_DIST); print_kv("MIN_FITNESS_FOR_GENE_POOL", MIN_FITNESS_FOR_GENE_POOL);
+        std::cout << "+" << hline << "+\n\n";
+    }
     if (!headless) {
         if (SDL_Init(SDL_INIT_VIDEO) < 0) {
             std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;

@@ -96,14 +96,6 @@ public:
     std::set<std::pair<int, int>> visited_cells;
     void update_exploration_cell(int cell_size, int world_width, int world_height);
 
-    // Hall of Fame for all-time best genes
-    static std::vector<GeneEntry> hall_of_fame;
-    static constexpr int HALL_OF_FAME_SIZE = 10;
-    static void update_hall_of_fame(float fitness, const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases);
-    static GeneEntry sample_hall_of_fame();
-    static void save_hall_of_fame(const std::string& filename = "hall_of_fame.txt");
-    static void load_hall_of_fame(const std::string& filename = "hall_of_fame.txt");
-
     // Diversity-based gene pool pruning
     static float genetic_distance(const GeneEntry& a, const GeneEntry& b);
     static void prune_gene_pool_diversity(float min_distance = 0.2f);

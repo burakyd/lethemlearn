@@ -543,14 +543,12 @@ void Player::try_insert_gene_to_pool(float fitness, const std::vector<std::vecto
     bool updated = false;
     if (gene_pool.size() < GENE_POOL_SIZE) {
         gene_pool.push_back({fitness, genes, biases});
-        update_hall_of_fame(fitness, genes, biases);
         updated = true;
         last_inserted_fitness = fitness;
     } else {
         auto min_it = std::min_element(gene_pool.begin(), gene_pool.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness < b.fitness; });
         if (fitness > min_it->fitness) {
             *min_it = {fitness, genes, biases};
-            update_hall_of_fame(fitness, genes, biases);
             updated = true;
             last_inserted_fitness = fitness;
         } else {
@@ -728,85 +726,6 @@ std::vector<std::vector<float>> crossover_biases(const std::vector<std::vector<f
         }
     }
     return result;
-}
-
-// Hall of Fame for all-time best genes
-std::vector<Player::GeneEntry> Player::hall_of_fame;
-
-void Player::update_hall_of_fame(float fitness, const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases) {
-    // Insert if not full, or replace worst if better
-    if (hall_of_fame.size() < HALL_OF_FAME_SIZE) {
-        hall_of_fame.push_back({fitness, genes, biases});
-    } else {
-        auto min_it = std::min_element(hall_of_fame.begin(), hall_of_fame.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness < b.fitness; });
-        if (fitness > min_it->fitness) {
-            *min_it = {fitness, genes, biases};
-        } else {
-            return;
-        }
-    }
-    std::sort(hall_of_fame.begin(), hall_of_fame.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness > b.fitness; });
-    save_hall_of_fame("hall_of_fame.txt");
-}
-
-Player::GeneEntry Player::sample_hall_of_fame() {
-    if (hall_of_fame.empty()) throw std::runtime_error("Hall of Fame is empty");
-    int idx = rand() % hall_of_fame.size();
-    return hall_of_fame[idx];
-}
-
-void Player::save_hall_of_fame(const std::string& filename) {
-    std::ofstream ofs(filename);
-    ofs << "HALL_OF_FAME\n";
-    for (const auto& entry : hall_of_fame) {
-        ofs << "FITNESS " << entry.fitness << "\n";
-        ofs << "GENES\n";
-        for (const auto& layer : entry.genes) {
-            for (float w : layer) ofs << w << ' ';
-            ofs << '\n';
-        }
-        ofs << "BIASES\n";
-        for (const auto& bias : entry.biases) {
-            for (float b : bias) ofs << b << ' ';
-            ofs << '\n';
-        }
-        ofs << "END\n";
-    }
-}
-
-void Player::load_hall_of_fame(const std::string& filename) {
-    hall_of_fame.clear();
-    std::ifstream ifs(filename);
-    if (!ifs) return;
-    std::string line;
-    while (std::getline(ifs, line)) {
-        if (line == "FITNESS " || line.rfind("FITNESS ", 0) == 0) {
-            float fitness = std::stof(line.substr(8));
-            std::getline(ifs, line); // GENES
-            std::vector<std::vector<float>> genes;
-            for (int l = 0; l < 4; ++l) {
-                std::getline(ifs, line);
-                std::istringstream iss(line);
-                std::vector<float> layer;
-                float w;
-                while (iss >> w) layer.push_back(w);
-                genes.push_back(layer);
-            }
-            std::getline(ifs, line); // BIASES
-            std::vector<std::vector<float>> biases;
-            for (int l = 0; l < 4; ++l) {
-                std::getline(ifs, line);
-                std::istringstream iss(line);
-                std::vector<float> bias;
-                float b;
-                while (iss >> b) bias.push_back(b);
-                biases.push_back(bias);
-            }
-            std::getline(ifs, line); // END
-            hall_of_fame.push_back({fitness, genes, biases});
-        }
-    }
-    std::sort(hall_of_fame.begin(), hall_of_fame.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness > b.fitness; });
 }
 
 float Player::adaptive_mutation_rate = MUTATION_RATE;

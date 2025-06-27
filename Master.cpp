@@ -25,13 +25,12 @@ std::string in_file(int island) {
     return MIGRATION_DIR + "/migrants_to_" + std::to_string(island) + ".dat";
 }
 
-void launch_island(int island) {
-    std::string cmd = "start \"island" + std::to_string(island) + "\" "
-        + SIM_EXE
+void launch_island_thread(int island) {
+    std::string cmd = SIM_EXE
         + " --island_id " + std::to_string(island)
         + " --gene_pool_file " + gene_pool_file(island)
         + " --migration_dir " + MIGRATION_DIR
-        + " --headless > island_" + std::to_string(island) + ".log 2>&1";
+        + " --headless";
     std::system(cmd.c_str());
 }
 
@@ -104,9 +103,11 @@ void clean_migration_dir() {
 int main() {
     std::filesystem::create_directory(MIGRATION_DIR);
     clean_migration_dir();
-    // Launch islands
+    // Launch islands in parallel
+    std::vector<std::thread> island_threads;
     for (int i = 0; i < NUM_ISLANDS; ++i) {
-        launch_island(i);
+        island_threads.emplace_back(launch_island_thread, i);
+        std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Add delay between launches
     }
     for (int mig = 0; mig < NUM_MIGRATIONS; ++mig) {
         std::cout << "[Master] Migration round " << mig << std::endl;
@@ -124,5 +125,9 @@ int main() {
     }
     std::cout << "[Master] Stop signals sent to all islands." << std::endl;
     std::cout << "[Master] Done. You may want to kill the islands manually if they run forever." << std::endl;
+    // Join all threads before exiting
+    for (auto& t : island_threads) {
+        if (t.joinable()) t.join();
+    }
     return 0;
 } 
