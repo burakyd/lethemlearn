@@ -8,9 +8,9 @@
 #include <cstdio>
 
 // Configuration
-const int NUM_ISLANDS = 4;
+const int NUM_ISLANDS = 6;
 const int NUM_MIGRANTS = 5;
-const int MIGRATION_INTERVAL = 1000; // generations (should match island)
+const int MIGRATION_INTERVAL = 40000; // generations (should match island)
 const int NUM_MIGRATIONS = 20; // how many migrations to perform
 const std::string SIM_EXE = "main.exe"; // built from main.cpp
 const std::string MIGRATION_DIR = "migration";
@@ -91,8 +91,19 @@ void print_fitness_logs() {
     }
 }
 
+void clean_migration_dir() {
+    for (const auto& entry : std::filesystem::directory_iterator(MIGRATION_DIR)) {
+        const std::string fname = entry.path().filename().string();
+        if (fname.find("migrants_from_") == 0 || fname.find("migrants_to_") == 0 || fname.find("stop_island_") == 0 || fname.find("fitness_log_island_") == 0) {
+            std::filesystem::remove(entry.path());
+        }
+    }
+    std::cout << "[Master] Cleaned migration directory." << std::endl;
+}
+
 int main() {
     std::filesystem::create_directory(MIGRATION_DIR);
+    clean_migration_dir();
     // Launch islands
     for (int i = 0; i < NUM_ISLANDS; ++i) {
         launch_island(i);
@@ -105,6 +116,13 @@ int main() {
         std::cout << "[Master] Migration " << mig << " complete." << std::endl;
         print_fitness_logs();
     }
+    // Signal all islands to stop
+    for (int i = 0; i < NUM_ISLANDS; ++i) {
+        std::ofstream ofs(MIGRATION_DIR + "/stop_island_" + std::to_string(i));
+        ofs << "stop";
+        ofs.close();
+    }
+    std::cout << "[Master] Stop signals sent to all islands." << std::endl;
     std::cout << "[Master] Done. You may want to kill the islands manually if they run forever." << std::endl;
     return 0;
 } 

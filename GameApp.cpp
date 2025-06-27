@@ -264,14 +264,22 @@ void log_fitness(int island_id, const std::string& migration_dir) {
 }
 
 void GameApp::run() {
-    static const int MIGRATION_INTERVAL = 10000; // generations
-    static const int MIGRANT_COUNT = 10;
+    static const int MIGRATION_INTERVAL = 40000; // generations
+    static const int MIGRANT_COUNT = 5;
     int generation = 0;
     if (headless) {
         quit = false;
         sim_start_time = SDL_GetTicks();
         last_gene_pool_save = SDL_GetTicks();
         while (!quit) {
+            // Check for stop signal from master
+            if (!migration_dir.empty() && island_id >= 0) {
+                std::string stop_file = migration_dir + "/stop_island_" + std::to_string(island_id);
+                if (std::filesystem::exists(stop_file)) {
+                    std::cout << "[Island " << island_id << "] Stop signal received. Exiting." << std::endl;
+                    break;
+                }
+            }
             // Run simulation logic only
             game->update();
             ++generation;
