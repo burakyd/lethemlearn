@@ -12,6 +12,8 @@
 #include "Settings.h"
 #include <vector>
 #include <SDL.h>
+#include <omp.h> // Enable OpenMP parallelization
+
 extern int game_time_units;
 class Food;
 class Player;
@@ -22,7 +24,7 @@ namespace {
     int toWASD(float v) { return v > 0.5f ? 1 : 0; }
 }
 
-Player::Player(int width, int height, std::array<int, 3> color, float x, float y, bool alive)
+Player::Player(int width, int height, SDL_Color color, float x, float y, bool alive)
     : width(width), height(height), color(color), x(x), y(y), alive(alive), foodCount(0), lifeTime(0), killTime(0), foodScore(0), playerEaten(0), parent_id(-1), totalFoodEaten(0), totalPlayersEaten(0)
 {
     std::vector<int> layer_sizes = {NN_INPUTS, NN_H1, NN_H2, NN_H3, NN_OUTPUTS};
@@ -45,7 +47,7 @@ Player::Player(int width, int height, std::array<int, 3> color, float x, float y
     speed = MAX_SPEED;
 }
 
-Player::Player(const std::vector<std::vector<float>>& parent_genes, int width, int height, std::array<int, 3> color, float x, float y, int parent_id)
+Player::Player(const std::vector<std::vector<float>>& parent_genes, int width, int height, SDL_Color color, float x, float y, int parent_id)
     : genes(parent_genes), width(width), height(height), color(color), x(x), y(y), alive(true), foodCount(0), lifeTime(0), killTime(0), foodScore(0), playerEaten(0), parent_id(parent_id), totalFoodEaten(0), totalPlayersEaten(0)
 {
     biases.resize(genes.size());
@@ -53,6 +55,16 @@ Player::Player(const std::vector<std::vector<float>>& parent_genes, int width, i
         biases[l].resize(genes[l].size() / (l == genes.size() - 1 ? NN_H3 : (l == 0 ? NN_INPUTS : (l == 1 ? NN_H1 : NN_H2))));
         std::fill(biases[l].begin(), biases[l].end(), 0.0f);
     }
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_real_distribution<float> angle_dist(0.0f, 2.0f * M_PI);
+    angle = angle_dist(gen);
+    speed = MAX_SPEED;
+}
+
+Player::Player(const std::vector<std::vector<float>>& parent_genes, const std::vector<std::vector<float>>& parent_biases, int width, int height, SDL_Color color, float x, float y, int parent_id)
+    : genes(parent_genes), biases(parent_biases), width(width), height(height), color(color), x(x), y(y), alive(true), foodCount(0), lifeTime(0), killTime(0), foodScore(0), playerEaten(0), parent_id(parent_id), totalFoodEaten(0), totalPlayersEaten(0)
+{
     static std::random_device rd;
     static std::mt19937 gen(rd());
     static std::uniform_real_distribution<float> angle_dist(0.0f, 2.0f * M_PI);
@@ -106,37 +118,15 @@ std::array<float, NN_OUTPUTS> Player::predict(const std::array<float, NN_INPUTS>
     return result;
 }
 
-void Player::mutate(int nMutate) {
-    for (int m = 0; m < nMutate; ++m) {
-        int l = rand() % genes.size();
-        int idx = rand() % genes[l].size();
-        genes[l][idx] += ((float)rand() / RAND_MAX * 2 - 1) * 0.1f;
-        // Mutate bias as well
-        int bidx = rand() % biases[l].size();
-        biases[l][bidx] += ((float)rand() / RAND_MAX * 2 - 1) * 0.1f;
-        // Occasionally reset a weight or bias
-        if (rand() % 20 == 0) {
-            genes[l][idx] = ((float)rand() / RAND_MAX * 2 - 1) * 0.5f;
-            biases[l][bidx] = ((float)rand() / RAND_MAX * 2 - 1) * 0.5f;
-        }
-    }
-}
-
-std::vector<std::vector<float>> Player::mitosis(bool mutate) {
+std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> Player::mitosis(bool mutate) {
     std::vector<std::vector<float>> new_genes = genes;
+    std::vector<std::vector<float>> new_biases = biases;
     if (mutate) {
-        for (auto& layer : new_genes) {
-            for (auto& w : layer) {
-                w += ((float)rand() / RAND_MAX * 2 - 1) * 0.05f;
-            }
-        }
-        for (auto& bias : biases) {
-            for (auto& b : bias) {
-                b += ((float)rand() / RAND_MAX * 2 - 1) * 0.05f;
-            }
-        }
+        int nMutate = int(MUTATION_ATTEMPTS * Player::adaptive_mutation_rate);
+        mutate_genes(new_genes, nMutate);
+        mutate_biases(new_biases, nMutate);
     }
-    return new_genes;
+    return {new_genes, new_biases};
 }
 
 bool Player::collide(const Player& other) const {
@@ -413,10 +403,9 @@ void Player::update(Game& game) {
     if (!alive) return;
     if (MITOSIS > 0 && foodCount >= 2 && rand() % MITOSIS == 0) {
         int child_food = foodCount / 2;
-        std::vector<std::vector<float>> child_genes1 = mitosis(true);
-        std::vector<std::vector<float>> child_genes2 = mitosis(true);
-        Player* child1 = new Player(child_genes1, DOT_WIDTH + child_food * FOOD_APPEND, DOT_HEIGHT + child_food * FOOD_APPEND, color, x, y, parent_id);
-        Player* child2 = new Player(child_genes2, DOT_WIDTH + child_food * FOOD_APPEND, DOT_HEIGHT + child_food * FOOD_APPEND, color, x, y, parent_id);
+        std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> child_genes = mitosis(true);
+        Player* child1 = new Player(child_genes.first, child_genes.second, DOT_WIDTH + child_food * FOOD_APPEND, DOT_HEIGHT + child_food * FOOD_APPEND, color, x, y, parent_id);
+        Player* child2 = new Player(child_genes.first, child_genes.second, DOT_WIDTH + child_food * FOOD_APPEND, DOT_HEIGHT + child_food * FOOD_APPEND, color, x, y, parent_id);
         child1->foodCount = child_food;
         child2->foodCount = child_food;
         child1->update_size_from_food();
@@ -463,7 +452,7 @@ void Player::update(Game& game) {
 
 void Player::draw(SDL_Renderer* renderer) {
     SDL_Rect rect = {static_cast<int>(x - width / 2.0f), static_cast<int>(y - height / 2.0f), width, height};
-    SDL_SetRenderDrawColor(renderer, color[0], color[1], color[2], 255);
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
     SDL_RenderFillRect(renderer, &rect);
     // Draw direction arrow (half as long, with arrowhead)
     float cx = x;
@@ -514,12 +503,23 @@ void mutate_genes(std::vector<std::vector<float>>& genes, int nMutate) {
     for (int m = 0; m < nMutate; ++m) {
         int l = rand() % genes.size();
         int idx = rand() % genes[l].size();
-        float noise = ((float)rand() / RAND_MAX) * 0.2f - 0.1f;
-        // 5% chance for a large mutation
-        if (rand() % 20 == 0) noise *= 5.0f;
+        float noise = ((float)rand() / RAND_MAX * 2 - 1) * MUTATION_MAGNITUDE;
+        // Large mutation
+        if (((float)rand() / RAND_MAX) < LARGE_MUTATION_PROB) noise *= LARGE_MUTATION_SCALE;
         genes[l][idx] += noise;
         // 1% chance for full randomization
         if (rand() % 100 == 0) genes[l][idx] = ((float)rand() / RAND_MAX * 2 - 1) * 0.5f;
+    }
+}
+
+void mutate_biases(std::vector<std::vector<float>>& biases, int nMutate) {
+    for (int m = 0; m < nMutate; ++m) {
+        int l = rand() % biases.size();
+        int idx = rand() % biases[l].size();
+        float noise = ((float)rand() / RAND_MAX * 2 - 1) * MUTATION_MAGNITUDE;
+        if (((float)rand() / RAND_MAX) < LARGE_MUTATION_PROB) noise *= LARGE_MUTATION_SCALE;
+        biases[l][idx] += noise;
+        if (rand() % 100 == 0) biases[l][idx] = ((float)rand() / RAND_MAX * 2 - 1) * 0.5f;
     }
 }
 
@@ -535,40 +535,52 @@ float Player::get_random_input() const {
 
 // --- Gene Pool System ---
 std::vector<Player::GeneEntry> Player::gene_pool;
+float Player::last_inserted_fitness = 0.0f;
+float Player::get_last_inserted_fitness() { return last_inserted_fitness; }
 
 void Player::try_insert_gene_to_pool(float fitness, const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases) {
-    // Prevent human players from being added to the gene pool
-    // This function is static, so we can't check an instance, but the call site is now protected.
-    // Defensive: if genes or biases are empty, do nothing (could indicate human or error)
     if (genes.empty() || biases.empty()) return;
-    // Insert if pool not full or fitness is better than the worst
+    bool updated = false;
     if (gene_pool.size() < GENE_POOL_SIZE) {
         gene_pool.push_back({fitness, genes, biases});
-        // Update Hall of Fame
         update_hall_of_fame(fitness, genes, biases);
-        // Compute average fitness
-        float avg_fitness = 0.0f;
-        for (const auto& entry : gene_pool) avg_fitness += entry.fitness;
-        avg_fitness /= gene_pool.size();
-        std::cout << "Inserted fitness: " << fitness << ", game time(k): " << (int)(game_time_units/1000)
-                  << ", avg fitness: " << avg_fitness << std::endl;
+        updated = true;
+        last_inserted_fitness = fitness;
     } else {
         auto min_it = std::min_element(gene_pool.begin(), gene_pool.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness < b.fitness; });
         if (fitness > min_it->fitness) {
             *min_it = {fitness, genes, biases};
-            // Update Hall of Fame
             update_hall_of_fame(fitness, genes, biases);
-            // Compute average fitness
-            float avg_fitness = 0.0f;
-            for (const auto& entry : gene_pool) avg_fitness += entry.fitness;
-            avg_fitness /= gene_pool.size();
-            std::cout << "Replaced worst with fitness: " << fitness << ", game time(k): " << (int)(game_time_units/1000)
-                      << ", avg fitness: " << avg_fitness << std::endl;
+            updated = true;
+            last_inserted_fitness = fitness;
         } else {
             return;
         }
     }
-    // Keep pool sorted descending
+    if (updated) {
+        // Efficiently compute best and avg fitness in one pass
+        float avg_fitness = 0.0f;
+        float best_fitness = gene_pool.empty() ? 0.0f : gene_pool[0].fitness;
+        for (const auto& entry : gene_pool) {
+            avg_fitness += entry.fitness;
+            if (entry.fitness > best_fitness) best_fitness = entry.fitness;
+        }
+        avg_fitness /= gene_pool.size();
+        set_display_fitness(best_fitness, avg_fitness, fitness);
+        // Efficiently compute average diversity (pairwise genetic distance) in parallel
+        float diversity_sum = 0.0f;
+        int diversity_count = 0;
+        size_t n = gene_pool.size();
+        #pragma omp parallel for reduction(+:diversity_sum,diversity_count) schedule(static)
+        for (int i = 0; i < (int)n; ++i) {
+            for (int j = i + 1; j < (int)n; ++j) {
+                diversity_sum += genetic_distance(gene_pool[i], gene_pool[j]);
+                diversity_count++;
+            }
+        }
+        float avg_diversity = (diversity_count > 0) ? (diversity_sum / diversity_count) : 0.0f;
+        set_display_diversity(avg_diversity);
+    }
     std::sort(gene_pool.begin(), gene_pool.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness > b.fitness; });
 }
 
@@ -633,7 +645,7 @@ Player::GeneEntry Player::sample_gene_from_pool() {
     return gene_pool[idx];
 }
 
-HumanPlayer::HumanPlayer(int width, int height, std::array<int, 3> color, float x, float y, bool alive)
+HumanPlayer::HumanPlayer(int width, int height, SDL_Color color, float x, float y, bool alive)
     : Player(width, height, color, x, y, alive)
 {
     is_human = true;
@@ -716,17 +728,6 @@ std::vector<std::vector<float>> crossover_biases(const std::vector<std::vector<f
         }
     }
     return result;
-}
-
-void mutate_biases(std::vector<std::vector<float>>& biases, int nMutate) {
-    for (int m = 0; m < nMutate; ++m) {
-        int l = rand() % biases.size();
-        int idx = rand() % biases[l].size();
-        float noise = ((float)rand() / RAND_MAX) * 0.2f - 0.1f;
-        if (rand() % 20 == 0) noise *= 5.0f;
-        biases[l][idx] += noise;
-        if (rand() % 100 == 0) biases[l][idx] = ((float)rand() / RAND_MAX * 2 - 1) * 0.5f;
-    }
 }
 
 // Hall of Fame for all-time best genes
@@ -826,30 +827,117 @@ float Player::genetic_distance(const GeneEntry& a, const GeneEntry& b) {
     return dist / count;
 }
 
-void Player::prune_gene_pool_diversity(int max_size, float min_distance) {
-    if ((int)gene_pool.size() <= max_size) return;
-    // Sort by fitness descending
+void Player::prune_gene_pool_diversity(float min_distance) {
+    if (gene_pool.size() < 5) return; // Don't prune if pool is too small
+    int before = gene_pool.size();
+    int n_to_remove = std::max(1, int(gene_pool.size() * PRUNE_RATE));
+    int elite_count = std::max(1, int(gene_pool.size() * ELITISM_PERCENT));
     std::sort(gene_pool.begin(), gene_pool.end(), [](const GeneEntry& a, const GeneEntry& b) { return a.fitness > b.fitness; });
-    std::vector<GeneEntry> new_pool;
-    for (const auto& entry : gene_pool) {
-        bool too_close = false;
-        for (const auto& kept : new_pool) {
-            if (genetic_distance(entry, kept) < min_distance) {
-                too_close = true;
-                break;
+    std::vector<GeneEntry> new_pool(gene_pool.begin(), gene_pool.begin() + elite_count);
+    // Prepare the rest for diversity pruning
+    std::vector<GeneEntry> candidates(gene_pool.begin() + elite_count, gene_pool.end());
+    // Calculate avg diversity before pruning
+    float diversity_sum_before = 0.0f;
+    int diversity_count_before = 0;
+    size_t pool_size = gene_pool.size();
+    #pragma omp parallel for reduction(+:diversity_sum_before,diversity_count_before) schedule(static)
+    for (int i = 0; i < (int)pool_size; ++i) {
+        for (int j = i + 1; j < (int)pool_size; ++j) {
+            diversity_sum_before += genetic_distance(gene_pool[i], gene_pool[j]);
+            diversity_count_before++;
+        }
+    }
+    float avg_diversity_before = (diversity_count_before > 0) ? (diversity_sum_before / diversity_count_before) : 0.0f;
+    // Parallel pairwise distance matrix for candidates
+    std::vector<std::vector<float>> distances(candidates.size(), std::vector<float>(candidates.size(), 0.0f));
+    #pragma omp parallel for schedule(static)
+    for (int i = 0; i < (int)candidates.size(); ++i) {
+        for (int j = i + 1; j < (int)candidates.size(); ++j) {
+            float dist = genetic_distance(candidates[i], candidates[j]);
+            distances[i][j] = dist;
+            distances[j][i] = dist;
+        }
+    }
+    std::vector<bool> to_remove(candidates.size(), false);
+    // Remove the most redundant (least diverse, lowest fitness) entries
+    for (int k = 0; k < n_to_remove; ++k) {
+        int worst_idx = -1;
+        float min_div = 1e9f;
+        for (size_t i = 0; i < candidates.size(); ++i) {
+            if (to_remove[i]) continue;
+            float min_dist = 1e9f;
+            for (size_t j = 0; j < candidates.size(); ++j) {
+                if (i == j || to_remove[j]) continue;
+                if (distances[i][j] < min_dist) min_dist = distances[i][j];
+            }
+            // If two are too close, prefer to remove the one with lower fitness
+            if (min_dist < min_distance && min_dist < min_div) {
+                min_div = min_dist;
+                worst_idx = i;
             }
         }
-        if (!too_close) new_pool.push_back(entry);
-        if ((int)new_pool.size() >= max_size) break;
+        if (worst_idx >= 0) to_remove[worst_idx] = true;
     }
-    // If not enough, fill with next best regardless of diversity
-    for (const auto& entry : gene_pool) {
-        if ((int)new_pool.size() >= max_size) break;
-        bool already = false;
-        for (const auto& kept : new_pool) {
-            if (&entry == &kept) { already = true; break; }
+    int removed = 0;
+    // Add remaining diverse candidates to the pool
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        if (!to_remove[i]) new_pool.push_back(candidates[i]);
+        else removed++;
+    }
+    // Remove the refill part: do not fill up new_pool to before size
+    int after = new_pool.size();
+    // Diversity info: recalculate for new_pool only (parallelized)
+    float diversity_sum = 0.0f;
+    int diversity_count = 0;
+    size_t new_pool_size = new_pool.size();
+    #pragma omp parallel for reduction(+:diversity_sum,diversity_count) schedule(static)
+    for (int i = 0; i < (int)new_pool_size; ++i) {
+        for (int j = i + 1; j < (int)new_pool_size; ++j) {
+            diversity_sum += genetic_distance(new_pool[i], new_pool[j]);
+            diversity_count++;
         }
-        if (!already) new_pool.push_back(entry);
+    }
+    float avg_diversity = (diversity_count > 0) ? (diversity_sum / diversity_count) : 0.0f;
+    if (removed > 0) {
+        // std::cout << "[PRUNE] removed: " << removed
+        //           << ", elites kept: " << elite_count
+        //           << ", avg diversity: " << avg_diversity
+        //           << std::endl;
     }
     gene_pool = new_pool;
+}
+
+// Helper to generate random genes and biases
+std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> random_genes_and_biases() {
+    std::vector<int> layer_sizes = {NN_INPUTS, NN_H1, NN_H2, NN_H3, NN_OUTPUTS};
+    std::vector<std::vector<float>> genes, biases;
+    for (size_t i = 0; i < layer_sizes.size() - 1; ++i) {
+        int in = layer_sizes[i], out = layer_sizes[i+1];
+        std::vector<float> layer(in * out);
+        std::vector<float> bias(out);
+        float a = std::sqrt(6.0f / (in + out));
+        for (auto& w : layer) w = ((float)rand() / RAND_MAX * 2 - 1) * a;
+        for (auto& b : bias) b = 0.0f;
+        genes.push_back(layer);
+        biases.push_back(bias);
+    }
+    return {genes, biases};
+}
+
+// --- Stats for display ---
+float Player::display_best_fitness = 0.0f;
+float Player::display_avg_fitness = 0.0f;
+float Player::display_last_fitness = 0.0f;
+float Player::display_avg_diversity = 0.0f;
+float Player::display_mutation_rate = 0.0f;
+void Player::set_display_fitness(float best, float avg, float last) {
+    display_best_fitness = best;
+    display_avg_fitness = avg;
+    display_last_fitness = last;
+}
+void Player::set_display_diversity(float avg_div) {
+    display_avg_diversity = avg_div;
+}
+void Player::set_display_mutation_rate(float rate) {
+    display_mutation_rate = rate;
 } 

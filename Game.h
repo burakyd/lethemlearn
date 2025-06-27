@@ -14,8 +14,8 @@ public:
     void render();
     void handleEvents();
     void reset();
-    void newPlayer(int number = 1, int width = DOT_WIDTH, int height = DOT_HEIGHT, std::array<int, 3> color = DOT_COLOR, float speed = SPEED, bool random_color = true, bool random_size = false);
-    void newHunter(int number = 1, int width = HUNTER_WIDTH, int height = HUNTER_HEIGHT, std::array<int, 3> color = HUNTER_COLOR, float speed = SPEED, bool random_color = true, bool random_size = false);
+    void newPlayer(const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases, int width = DOT_WIDTH, int height = DOT_HEIGHT, SDL_Color color = DOT_COLOR, float speed = SPEED);
+    void newHunter(int number = 1, int width = HUNTER_WIDTH, int height = HUNTER_HEIGHT, SDL_Color color = HUNTER_COLOR, float speed = SPEED, bool random_color = true, bool random_size = false);
     void randomFood(int num = 1);
     void maintain_population();
 

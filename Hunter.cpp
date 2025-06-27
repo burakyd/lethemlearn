@@ -3,10 +3,11 @@
 #include <random>
 #include <algorithm>
 #include "Food.h"
+#include "Player.h"
 
 constexpr float HUNTER_SPEED = 0.2f;
 
-Hunter::Hunter(int width, int height, std::array<int, 3> color, float x, float y, float speed, bool alive)
+Hunter::Hunter(int width, int height, SDL_Color color, float x, float y, float speed, bool alive)
     : Player(width, height, color, x, y, alive), movetime(0), keys{0,0,0,0} {
     this->speed = HUNTER_SPEED;
 }
@@ -106,7 +107,9 @@ bool Hunter::eatPlayer(Game& game, Player& other) {
         // Do NOT increase size or foodCount
         // Replenish population if needed
         if (std::count_if(game.players.begin(), game.players.end(), [](Player* p){ return p->alive; }) <= MIN_BOT) {
-            game.newPlayer(1, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SPEED, true, true);
+            auto [genes, biases] = random_genes_and_biases();
+            SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+            game.newPlayer(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, SPEED);
         }
         return true;
     }

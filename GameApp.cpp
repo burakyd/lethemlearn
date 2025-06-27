@@ -14,6 +14,7 @@
 #include <vector>
 #include "Game.h"
 #include "Settings.h"
+#include <cmath>
 
 extern int game_time_units;
 
@@ -21,6 +22,50 @@ GameApp::GameApp() {}
 GameApp::~GameApp() {}
 
 bool GameApp::init() {
+    // Print essential configuration values from Settings.h (ASCII formatting)
+    const char* hline = "-----------------------------------------------------------------------------------------------------------------------------------------------";
+    std::cout << "\n+" << hline << "+\n";
+    std::cout << "|" << std::setw(80) << std::left << " Simulation Configuration " << hline + 80 << "|\n";
+    auto print_section = [](const std::string& title) {
+        std::cout << "|\n|  " << std::left << std::setw(30) << title << std::setw(110 - title.size()) << " " << "|\n";
+    };
+    auto print_kv = [](const std::string& key, auto value) {
+        std::cout << "|    " << std::left << std::setw(36) << key << ": " << std::setw(12) << value << "|\n";
+    };
+    print_section("[Display]");
+    print_kv("SCREEN_WIDTH", SCREEN_WIDTH); print_kv("SCREEN_HEIGHT", SCREEN_HEIGHT); print_kv("SPEED", SPEED);
+    print_section("[Player]");
+    print_kv("DOT_WIDTH", DOT_WIDTH); print_kv("DOT_HEIGHT", DOT_HEIGHT); print_kv("RANDOM_SIZE_MIN", RANDOM_SIZE_MIN); print_kv("RANDOM_SIZE_MAX", RANDOM_SIZE_MAX);
+    print_kv("MAX_SPEED", MAX_SPEED); print_kv("MAX_PLAYER_SIZE", MAX_PLAYER_SIZE);
+    print_kv("PLAYER_MIN_SPEED_FACTOR", PLAYER_MIN_SPEED_FACTOR); print_kv("PLAYER_SIZE_SPEED_EXPONENT", PLAYER_SIZE_SPEED_EXPONENT); print_kv("PLAYER_GROWTH_EXPONENT", PLAYER_GROWTH_EXPONENT);
+    print_section("[Food]");
+    print_kv("FOOD_WIDTH", FOOD_WIDTH); print_kv("FOOD_HEIGHT", FOOD_HEIGHT); print_kv("FOOD_APPEND", FOOD_APPEND);
+    print_kv("EATEN_FACTOR", EATEN_FACTOR); print_kv("EATEN_ADD", EATEN_ADD);
+    print_section("[Game Mechanics]");
+    print_kv("KILL_TIME", KILL_TIME); print_kv("NUMBER_OF_FOODS", NUMBER_OF_FOODS); print_kv("HUNTERS", HUNTERS);
+    print_kv("HUNTER_WIDTH", HUNTER_WIDTH); print_kv("HUNTER_HEIGHT", HUNTER_HEIGHT); print_kv("MIN_BOT", MIN_BOT); print_kv("KILL", KILL);
+    print_section("[Player Controls]");
+    print_kv("PLAYER_ENABLED", PLAYER_ENABLED);
+    print_section("[Evolution]");
+    print_kv("MITOSIS", MITOSIS);
+    print_section("[Neural Network]");
+    print_kv("NN_INPUTS", NN_INPUTS); print_kv("NN_H1", NN_H1); print_kv("NN_H2", NN_H2); print_kv("NN_H3", NN_H3); print_kv("NN_OUTPUTS", NN_OUTPUTS);
+    print_section("[Genetic Algorithm]");
+    print_kv("GENE_POOL_SIZE", GENE_POOL_SIZE); print_kv("ELITISM_PERCENT", ELITISM_PERCENT); print_kv("MUTATION_RATE", MUTATION_RATE);
+    print_kv("MUTATION_ATTEMPTS", MUTATION_ATTEMPTS); print_kv("MUTATION_MAGNITUDE", MUTATION_MAGNITUDE); print_kv("LARGE_MUTATION_PROB", LARGE_MUTATION_PROB); print_kv("LARGE_MUTATION_SCALE", LARGE_MUTATION_SCALE);
+    print_kv("ADAPTIVE_MUTATION_PATIENCE", ADAPTIVE_MUTATION_PATIENCE); print_kv("MAX_MUTATION_RATE", MAX_MUTATION_RATE); print_kv("ADAPTIVE_MUTATION_FACTOR", ADAPTIVE_MUTATION_FACTOR);
+    print_kv("GENE_POOL_CHECK_INTERVAL", GENE_POOL_CHECK_INTERVAL); print_kv("PRUNE_RATE", PRUNE_RATE);
+    print_section("[Hunger/Food Decrease]");
+    print_kv("HUNGER_BASE", HUNGER_BASE); print_kv("HUNGER_SCALE", HUNGER_SCALE); print_kv("HUNGER_EXPONENT", HUNGER_EXPONENT); print_kv("HUNGER_MIN", HUNGER_MIN); print_kv("HUNGER_MAX", HUNGER_MAX);
+    print_section("[Wall Penalty]");
+    print_kv("WALL_PENALTY_PER_FRAME", WALL_PENALTY_PER_FRAME);
+    print_section("[Fitness]");
+    print_kv("TOP_ALIVE_TO_INSERT", TOP_ALIVE_TO_INSERT);
+    print_kv("FITNESS_WEIGHT_FOOD", FITNESS_WEIGHT_FOOD); print_kv("FITNESS_WEIGHT_LIFE", FITNESS_WEIGHT_LIFE); print_kv("FITNESS_WEIGHT_EXPLORE", FITNESS_WEIGHT_EXPLORE); print_kv("FITNESS_WEIGHT_PLAYERS", FITNESS_WEIGHT_PLAYERS);
+    print_kv("FITNESS_MIN_FOOD", FITNESS_MIN_FOOD); print_kv("FITNESS_MIN_LIFE", FITNESS_MIN_LIFE); print_kv("FITNESS_EARLY_DEATH_TIME", FITNESS_EARLY_DEATH_TIME); print_kv("FITNESS_EARLY_DEATH_PENALTY", FITNESS_EARLY_DEATH_PENALTY);
+    print_kv("FITNESS_MIN_FOR_REPRO", FITNESS_MIN_FOR_REPRO); print_kv("FITNESS_MIN_LIFETIME_FOR_REPRO", FITNESS_MIN_LIFETIME_FOR_REPRO);
+    print_kv("FITNESS_DIVERSITY_PRUNE_MIN_DIST", FITNESS_DIVERSITY_PRUNE_MIN_DIST); print_kv("MIN_FITNESS_FOR_GENE_POOL", MIN_FITNESS_FOR_GENE_POOL);
+    std::cout << "+" << hline << "+\n\n";
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
         return false;
@@ -114,24 +159,56 @@ void GameApp::restart_simulation(const std::vector<std::vector<std::vector<float
         int used = 0;
         for (const auto& genes : *loaded_genes) {
             if (bots_to_spawn <= 0) break;
-            game->players.push_back(new Player(genes, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
+            SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+            game->players.push_back(new Player(genes, std::vector<std::vector<float>>(genes.size()), DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
             used++;
             bots_to_spawn--;
         }
-        if (used < bots_to_spawn)
-            game->newPlayer(bots_to_spawn - used, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SPEED, true, true);
+        if (used < bots_to_spawn) {
+            for (int i = 0; i < bots_to_spawn - used; ++i) {
+                auto [genes, biases] = random_genes_and_biases();
+                SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+                game->newPlayer(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, SPEED);
+            }
+        }
     } else if (best_gene && !best_gene->empty()) {
         for (int i = 0; i < bots_to_spawn; ++i) {
-            game->players.push_back(new Player(*best_gene, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
+            SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+            game->players.push_back(new Player(*best_gene, std::vector<std::vector<float>>(best_gene->size()), DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
         }
     } else {
-        game->newPlayer(bots_to_spawn, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SPEED, true, true);
+        for (int i = 0; i < bots_to_spawn; ++i) {
+            auto [genes, biases] = random_genes_and_biases();
+            SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+            game->newPlayer(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, SPEED);
+        }
     }
     if (g_hunters_enabled) {
         game->newHunter(g_hunter_count, HUNTER_WIDTH, HUNTER_HEIGHT, HUNTER_COLOR, SPEED, false, false);
     }
     game->randomFood(g_food_count);
+    // Reset mutation rate and update display after restart
+    Player::adaptive_mutation_rate = MUTATION_RATE;
+    Player::set_display_mutation_rate(Player::adaptive_mutation_rate);
 }
+
+// --- Mouse interaction state for settings ---
+struct SettingSlider {
+    std::string label;
+    int* value;
+    int min, max;
+    SDL_Rect bar, handle;
+    bool active = false;
+};
+struct SettingToggle {
+    std::string label;
+    bool* value;
+    SDL_Rect box;
+    bool active = false;
+};
+std::vector<SettingSlider> sliders;
+std::vector<SettingToggle> toggles;
+int dragging_slider = -1;
 
 void GameApp::run() {
     SDL_Event e;
@@ -398,40 +475,22 @@ void GameApp::run() {
         TTF_SizeText(font, "--- STATS ---", &text_width, &text_height);
         int sidebar_width = 200;
         int centered_x = SCREEN_WIDTH + (sidebar_width - text_width) / 2;
-        renderText(renderer, font, "--- STATS ---", centered_x, y, green); y += 35;
-        renderText(renderer, font, "Bots Alive: " + std::to_string(alive_players) + " / " + std::to_string(g_bot_count), sidebar_x, y, white); y += 28;
-        renderText(renderer, font, "Hunters:   " + std::string(g_hunters_enabled ? "[X] " : "[ ] ") + std::to_string(total_hunters) + " / " + std::to_string(g_hunter_count), sidebar_x, y, white); y += 28;
-        renderText(renderer, font, "Food:      " + std::to_string(total_food) + " / " + std::to_string(g_food_count), sidebar_x, y, white); y += 28;
+        renderText(renderer, font, "--- STATS ---", centered_x, y, green); y += 30;
+        renderText(renderer, font, "Bots Alive: " + std::to_string(alive_players) + " / " + std::to_string(g_bot_count), sidebar_x, y, white); y += 22;
+        renderText(renderer, font, "Hunters:   " + std::string(g_hunters_enabled ? "[X] " : "[ ] ") + std::to_string(total_hunters) + " / " + std::to_string(g_hunter_count), sidebar_x, y, white); y += 22;
+        renderText(renderer, font, "Food:      " + std::to_string(total_food) + " / " + std::to_string(g_food_count), sidebar_x, y, white); y += 22;
         Uint32 elapsed_ms = SDL_GetTicks() - sim_start_time;
         int seconds = elapsed_ms / 1000;
         int minutes = seconds / 60;
         seconds = seconds % 60;
         char timer_buf[32];
         snprintf(timer_buf, sizeof(timer_buf), "Time: %02d:%02d", minutes, seconds);
-        renderText(renderer, font, timer_buf, sidebar_x, y, white); y += 28;
-        renderText(renderer, font, "game time: " + std::to_string(game_time_units/1000) + "(k)", sidebar_x, y, white); y += 28;
+        renderText(renderer, font, timer_buf, sidebar_x, y, white); y += 22;
+        renderText(renderer, font, "game time: " + std::to_string(game_time_units/1000) + "(k)", sidebar_x, y, white); y += 22;
         std::string speed_str = (sim_speed == -2) ? "LOGIC MAX" : (sim_speed == -1) ? "MAX" : (std::to_string(sim_speed) + "x");
-        renderText(renderer, font, "Speed: " + speed_str, sidebar_x, y, white); y += 28;
-        if (paused) {
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 220);
-            SDL_Rect overlay = {SCREEN_WIDTH/2 - 220, SCREEN_HEIGHT/2 - 220, 440, 440};
-            SDL_RenderFillRect(renderer, &overlay);
-            int menu_text_width = 0, menu_text_height = 0;
-            TTF_SizeText(font, "--- MENU & SETTINGS ---", &menu_text_width, &menu_text_height);
-            int menu_centered_x = SCREEN_WIDTH/2 - 220 + (440 - menu_text_width) / 2;
-            renderText(renderer, font, "--- MENU & SETTINGS ---", menu_centered_x, SCREEN_HEIGHT/2 - 200, green);
-            int sy = SCREEN_HEIGHT/2 - 160;
-            renderText(renderer, font, "B/N: Bots +/-", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, std::to_string(pending_bot_count), SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
-            renderText(renderer, font, "F/G: Food +/-", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, std::to_string(pending_food_count), SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
-            renderText(renderer, font, "H: Toggle Hunters", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, pending_hunters_enabled ? "[X]" : "[ ]", SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
-            renderText(renderer, font, "J/K: Hunters +/-", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, std::to_string(pending_hunter_count), SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
-            renderText(renderer, font, "P: Toggle Human Player", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, pending_player_enabled ? "[X]" : "[ ]", SCREEN_WIDTH/2 + 100, sy, yellow); sy += 32;
-            std::string speed_str = (sim_speed == -2) ? "LOGIC MAX" : (sim_speed == -1) ? "MAX" : (std::to_string(sim_speed) + "x");
-            renderText(renderer, font, "Speed (UP/DOWN):", SCREEN_WIDTH/2 - 180, sy, white); renderText(renderer, font, speed_str, SCREEN_WIDTH/2 + 100, sy, cyan); sy += 32;
-            renderText(renderer, font, "ESC: Apply & Resume", SCREEN_WIDTH/2 - 80, sy + 32, cyan);
-            renderText(renderer, font, "R: Restart", SCREEN_WIDTH/2 - 80, sy + 64, yellow);
-        }
-        // Find best 3 bots and human player
+        renderText(renderer, font, "Speed: " + speed_str, sidebar_x, y, white); y += 22;
+        // Show top bots and human player stats after main stats, before fitness/diversity/mutation info
+        y += 8;
         std::vector<std::pair<Player*, int>> bot_stats; // (player, index)
         Player* human_player = nullptr;
         int idx = 0;
@@ -449,33 +508,160 @@ void GameApp::run() {
         std::sort(bot_stats.begin(), bot_stats.end(), [](const auto& a, const auto& b) {
             return a.first->foodCount > b.first->foodCount;
         });
-        // Show best 3 bots stats with column headers and compact rows
-        y += 10;
         renderText(renderer, font, "Top Bots:", sidebar_x, y, yellow); y += 18;
-        // Column headers
         renderText(renderer, font, "  S    F   L(k)", sidebar_x + 24, y, cyan); y += 16;
         for (int i = 0; i < std::min(5, (int)bot_stats.size()); ++i) {
             y += 10;
             Player* bot = bot_stats[i].first;
             SDL_Rect color_rect = {sidebar_x, y, 14, 14};
-            SDL_SetRenderDrawColor(renderer, bot->color[0], bot->color[1], bot->color[2], 255);
+            SDL_SetRenderDrawColor(renderer, bot->color.r, bot->color.g, bot->color.b, 255);
             SDL_RenderFillRect(renderer, &color_rect); y -= 4; // for a better look
-            // Only show values, not labels or bot number
             std::ostringstream oss;
             oss << std::setw(4) << std::setfill(' ') << bot->width << " "
                 << std::setw(3) << std::setfill(' ') << bot->foodCount << " "
                 << std::setw(4) << std::fixed << std::setprecision(1) << (bot->lifeTime / 1000.0f);
             renderText(renderer, font, oss.str(), sidebar_x + 24, y, white); y += 15;
         }
-        // Show human player stats
         if (g_player_enabled && human_player) {
             y += 8;
             renderText(renderer, font, "Human Player:", sidebar_x, y, cyan); y += 20;
             SDL_Rect color_rect = {sidebar_x, y, 18, 18};
-            SDL_SetRenderDrawColor(renderer, human_player->color[0], human_player->color[1], human_player->color[2], 255);
+            SDL_SetRenderDrawColor(renderer, human_player->color.r, human_player->color.g, human_player->color.b, 255);
             SDL_RenderFillRect(renderer, &color_rect);
             std::string hp_info = "S:" + std::to_string(human_player->width) + " F:" + std::to_string(human_player->foodCount);
             renderText(renderer, font, hp_info, sidebar_x + 24, y, white); y += 20;
+        }
+        // After stats, print fitness/diversity/mutation info
+        y += 6;
+        renderText(renderer, font, "FITNESS", sidebar_x, y, yellow); y += 18;
+        renderText(renderer, font, "best: " + std::to_string(int(Player::display_best_fitness)), sidebar_x, y, white); y += 15;
+        renderText(renderer, font, "avg:  " + std::to_string(int(Player::display_avg_fitness)), sidebar_x, y, white); y += 15;
+        renderText(renderer, font, "last: " + std::to_string(int(Player::display_last_fitness)), sidebar_x, y, white); y += 15;
+        float diversity = std::round(Player::display_avg_diversity * 1000.0f) / 1000.0f;
+        float mutation = std::round(Player::display_mutation_rate * 10000.0f) / 10000.0f;
+        std::string diversity_str = std::to_string(diversity);
+        diversity_str = diversity_str.substr(0, diversity_str.find(".") + 5);
+        std::string mutation_str = std::to_string(mutation);
+        mutation_str = mutation_str.substr(0, mutation_str.find(".") + 3);
+        renderText(renderer, font, "avg div: " + diversity_str, sidebar_x, y, white); y += 15;
+        renderText(renderer, font, "mut rate: " + mutation_str, sidebar_x, y, white); y += 15;
+        // --- Enhanced Settings Panel ---
+        if (paused) {
+            sliders.clear();
+            toggles.clear();
+            int sx = SCREEN_WIDTH/2 - 180, sw = 160, sh = 12, th = 32;
+            int sy = SCREEN_HEIGHT/2 - 160;
+            sliders.push_back({"Bots", &pending_bot_count, 1, 200, {sx + 140, sy + 10, sw, sh}, {}, false}); sy += th;
+            sliders.push_back({"Food", &pending_food_count, 1, 200, {sx + 140, sy + 10, sw, sh}, {}, false}); sy += th;
+            toggles.push_back({"Hunters", &pending_hunters_enabled, {sx + 140, sy + 6, 48, 20}, false}); sy += th;
+            sliders.push_back({"Hunter Count", &pending_hunter_count, 0, 50, {sx + 140, sy + 10, sw, sh}, {}, false}); sy += th;
+            toggles.push_back({"Human Player", &pending_player_enabled, {sx + 140, sy + 6, 48, 20}, false}); sy += th;
+            // Draw sliders and toggles in the same order as above
+            int draw_sy = SCREEN_HEIGHT/2 - 160;
+            size_t slider_idx = 0, toggle_idx = 0;
+            for (int row = 0; row < 5; ++row) {
+                if (row == 0) { // Bots slider
+                    auto& s = sliders[slider_idx++];
+                    renderText(renderer, font, s.label, sx, draw_sy, white);
+                    SDL_SetRenderDrawColor(renderer, 80, 80, 120, 255);
+                    SDL_RenderFillRect(renderer, &s.bar);
+                    float t = float(*s.value - s.min) / float(s.max - s.min);
+                    int handle_x = s.bar.x + int(t * (s.bar.w - 16));
+                    s.handle = {handle_x, s.bar.y - 4, 16, s.bar.h + 8};
+                    SDL_SetRenderDrawColor(renderer, s.active ? 180 : 120, s.active ? 180 : 120, 255, 255);
+                    SDL_RenderFillRect(renderer, &s.handle);
+                    renderText(renderer, font, std::to_string(*s.value), s.bar.x + s.bar.w + 12, draw_sy, yellow);
+                } else if (row == 1) { // Food slider
+                    auto& s = sliders[slider_idx++];
+                    renderText(renderer, font, s.label, sx, draw_sy, white);
+                    SDL_SetRenderDrawColor(renderer, 80, 80, 120, 255);
+                    SDL_RenderFillRect(renderer, &s.bar);
+                    float t = float(*s.value - s.min) / float(s.max - s.min);
+                    int handle_x = s.bar.x + int(t * (s.bar.w - 16));
+                    s.handle = {handle_x, s.bar.y - 4, 16, s.bar.h + 8};
+                    SDL_SetRenderDrawColor(renderer, s.active ? 180 : 120, s.active ? 180 : 120, 255, 255);
+                    SDL_RenderFillRect(renderer, &s.handle);
+                    renderText(renderer, font, std::to_string(*s.value), s.bar.x + s.bar.w + 12, draw_sy, yellow);
+                } else if (row == 2) { // Hunters toggle
+                    auto& t = toggles[toggle_idx++];
+                    renderText(renderer, font, t.label, sx, draw_sy, white);
+                    SDL_SetRenderDrawColor(renderer, *t.value ? 0 : 80, *t.value ? 200 : 80, *t.value ? 80 : 80, 255);
+                    SDL_RenderFillRect(renderer, &t.box);
+                    SDL_SetRenderDrawColor(renderer, 200, 200, 220, 255);
+                    SDL_RenderDrawRect(renderer, &t.box);
+                    if (*t.value) renderText(renderer, font, "ON", t.box.x + 8, t.box.y + 2, green);
+                    else renderText(renderer, font, "OFF", t.box.x + 8, t.box.y + 2, yellow);
+                } else if (row == 3) { // Hunter Count slider
+                    auto& s = sliders[slider_idx++];
+                    renderText(renderer, font, s.label, sx, draw_sy, white);
+                    SDL_SetRenderDrawColor(renderer, 80, 80, 120, 255);
+                    SDL_RenderFillRect(renderer, &s.bar);
+                    float t = float(*s.value - s.min) / float(s.max - s.min);
+                    int handle_x = s.bar.x + int(t * (s.bar.w - 16));
+                    s.handle = {handle_x, s.bar.y - 4, 16, s.bar.h + 8};
+                    SDL_SetRenderDrawColor(renderer, s.active ? 180 : 120, s.active ? 180 : 120, 255, 255);
+                    SDL_RenderFillRect(renderer, &s.handle);
+                    renderText(renderer, font, std::to_string(*s.value), s.bar.x + s.bar.w + 12, draw_sy, yellow);
+                } else if (row == 4) { // Human Player toggle
+                    auto& t = toggles[toggle_idx++];
+                    renderText(renderer, font, t.label, sx, draw_sy, white);
+                    SDL_SetRenderDrawColor(renderer, *t.value ? 0 : 80, *t.value ? 200 : 80, *t.value ? 80 : 80, 255);
+                    SDL_RenderFillRect(renderer, &t.box);
+                    SDL_SetRenderDrawColor(renderer, 200, 200, 220, 255);
+                    SDL_RenderDrawRect(renderer, &t.box);
+                    if (*t.value) renderText(renderer, font, "ON", t.box.x + 8, t.box.y + 2, green);
+                    else renderText(renderer, font, "OFF", t.box.x + 8, t.box.y + 2, yellow);
+                }
+                draw_sy += th;
+            }
+            renderText(renderer, font, "ESC: Apply & Resume", SCREEN_WIDTH/2 - 80, draw_sy + 32, cyan);
+            renderText(renderer, font, "R: Restart", SCREEN_WIDTH/2 - 80, draw_sy + 64, yellow);
+
+            // --- Mouse event handling for sliders/toggles ---
+            SDL_Event e;
+            while (SDL_PollEvent(&e)) {
+                if (e.type == SDL_QUIT) quit = true;
+                if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                    int mx = e.button.x, my = e.button.y;
+                    for (size_t i = 0; i < sliders.size(); ++i) {
+                        auto& s = sliders[i];
+                        if (mx >= s.handle.x && mx <= s.handle.x + s.handle.w && my >= s.handle.y && my <= s.handle.y + s.handle.h) {
+                            s.active = true;
+                            dragging_slider = (int)i;
+                        }
+                    }
+                    for (size_t i = 0; i < toggles.size(); ++i) {
+                        auto& t = toggles[i];
+                        if (mx >= t.box.x && mx <= t.box.x + t.box.w && my >= t.box.y && my <= t.box.y + t.box.h) {
+                            *t.value = !*t.value;
+                        }
+                    }
+                }
+                if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT) {
+                    for (auto& s : sliders) s.active = false;
+                    dragging_slider = -1;
+                }
+                if (e.type == SDL_MOUSEMOTION && dragging_slider != -1) {
+                    auto& s = sliders[dragging_slider];
+                    int mx = e.motion.x;
+                    float t = float(mx - s.bar.x) / float(s.bar.w - 16);
+                    t = std::max(0.0f, std::min(1.0f, t));
+                    *s.value = s.min + int(t * (s.max - s.min));
+                }
+                if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
+                    // Apply and resume
+                    g_bot_count = pending_bot_count;
+                    g_food_count = pending_food_count;
+                    g_hunters_enabled = pending_hunters_enabled;
+                    g_hunter_count = pending_hunter_count;
+                    g_player_enabled = pending_player_enabled;
+                    restart_simulation();
+                    paused = false;
+                }
+                if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_r) {
+                    restart_simulation();
+                }
+            }
         }
         SDL_RenderPresent(renderer);
     }

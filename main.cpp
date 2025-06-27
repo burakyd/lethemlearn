@@ -74,18 +74,29 @@ void restart_simulation(Game& game, SDL_Renderer* renderer, const std::vector<st
         int used = 0;
         for (const auto& genes : *loaded_genes) {
             if (bots_to_spawn <= 0) break;
-            game.players.push_back(new Player(genes, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
+            auto [random_genes, random_biases] = random_genes_and_biases();
+            game.players.push_back(new Player(random_genes, random_biases, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
             used++;
             bots_to_spawn--;
         }
-        if (used < bots_to_spawn)
-            game.newPlayer(bots_to_spawn - used, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SPEED, true, true);
+        if (used < bots_to_spawn) {
+            for (int i = 0; i < bots_to_spawn - used; ++i) {
+                auto [genes, biases] = random_genes_and_biases();
+                SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+                game.newPlayer(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, SPEED);
+            }
+        }
     } else if (best_gene && !best_gene->empty()) {
         for (int i = 0; i < bots_to_spawn; ++i) {
-            game.players.push_back(new Player(*best_gene, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
+            auto [random_genes, random_biases] = random_genes_and_biases();
+            game.players.push_back(new Player(random_genes, random_biases, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, static_cast<float>(rand() % SCREEN_WIDTH), static_cast<float>(rand() % SCREEN_HEIGHT)));
         }
     } else {
-        game.newPlayer(bots_to_spawn, DOT_WIDTH, DOT_HEIGHT, DOT_COLOR, SPEED, true, true);
+        for (int i = 0; i < bots_to_spawn; ++i) {
+            auto [genes, biases] = random_genes_and_biases();
+            SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+            game.newPlayer(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, SPEED);
+        }
     }
     if (g_hunters_enabled) {
         game.newHunter(g_hunter_count, HUNTER_WIDTH, HUNTER_HEIGHT, HUNTER_COLOR, SPEED, false, false);

@@ -6,6 +6,7 @@
 #include <random>
 #include <memory>
 #include <set>
+#include <utility>
 class Game;
 
 // Helper struct for NN input and dx/dy values
@@ -16,21 +17,21 @@ struct NNInputsResult {
 
 class Player {
 public:
-    Player(int width = DOT_WIDTH, int height = DOT_HEIGHT, std::array<int, 3> color = DOT_COLOR, float x = 0, float y = 0, bool alive = true);
-    Player(const std::vector<std::vector<float>>& parent_genes, int width, int height, std::array<int, 3> color, float x, float y, int parent_id = -1);
+    Player(int width = DOT_WIDTH, int height = DOT_HEIGHT, SDL_Color color = DOT_COLOR, float x = 0, float y = 0, bool alive = true);
+    Player(const std::vector<std::vector<float>>& parent_genes, int width, int height, SDL_Color color, float x, float y, int parent_id = -1);
+    Player(const std::vector<std::vector<float>>& parent_genes, const std::vector<std::vector<float>>& parent_biases, int width, int height, SDL_Color color, float x, float y, int parent_id = -1);
     virtual void update(Game& game);
-    void mutate(int nMutate = NUMBER_OF_MUTATES);
     std::array<float, NN_OUTPUTS> predict(const std::array<float, NN_INPUTS>& input);
     std::vector<std::vector<float>> genes; // Neural net weights (per layer: weights)
     std::vector<std::vector<float>> biases; // Neural net biases (per layer: biases)
-    std::vector<std::vector<float>> mitosis(bool mutate = true);
+    std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> mitosis(bool mutate = true);
     bool collide(const Player& other) const;
     virtual bool eatPlayer(Game& game, Player& other);
     virtual bool eatFood(Game& game);
     virtual void draw(SDL_Renderer* renderer);
     float x, y;
     int width, height;
-    std::array<int, 3> color;
+    SDL_Color color;
     float speed;
     int foodCount, lifeTime, killTime, foodScore, playerEaten;
     int totalFoodEaten = 0;
@@ -76,7 +77,6 @@ public:
         std::vector<std::vector<float>> biases;
     };
     static std::vector<GeneEntry> gene_pool;
-    static constexpr int GENE_POOL_SIZE = 10; // configurable pool size
     static void try_insert_gene_to_pool(float fitness, const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases);
     static void save_gene_pool(const std::string& filename = "gene_pool.txt");
     static void load_gene_pool(const std::string& filename = "gene_pool.txt");
@@ -106,20 +106,35 @@ public:
 
     // Diversity-based gene pool pruning
     static float genetic_distance(const GeneEntry& a, const GeneEntry& b);
-    static void prune_gene_pool_diversity(int max_size, float min_distance = 0.2f);
+    static void prune_gene_pool_diversity(float min_distance = 0.2f);
     // Adaptive mutation rate
     static float adaptive_mutation_rate;
+
+    // --- Stats for display ---
+    static float display_best_fitness;
+    static float display_avg_fitness;
+    static float display_last_fitness;
+    static float display_avg_diversity;
+    static float display_mutation_rate;
+    static void set_display_fitness(float best, float avg, float last);
+    static void set_display_diversity(float avg_div);
+    static void set_display_mutation_rate(float rate);
+
+    static float last_inserted_fitness; // Tracks the fitness of the last gene inserted into the pool
+    static float get_last_inserted_fitness();
 };
 
 // Helper functions for gene crossover and mutation
 std::vector<std::vector<float>> crossover(const std::vector<std::vector<float>>&, const std::vector<std::vector<float>>&);
-void mutate_genes(std::vector<std::vector<float>>&, int nMutate = NUMBER_OF_MUTATES);
+void mutate_genes(std::vector<std::vector<float>>&, int nMutate);
 // Bias crossover and mutation
 std::vector<std::vector<float>> crossover_biases(const std::vector<std::vector<float>>&, const std::vector<std::vector<float>>&);
-void mutate_biases(std::vector<std::vector<float>>&, int nMutate = NUMBER_OF_MUTATES);
+void mutate_biases(std::vector<std::vector<float>>&, int nMutate);
 
 class HumanPlayer : public Player {
 public:
-    HumanPlayer(int width = DOT_WIDTH, int height = DOT_HEIGHT, std::array<int, 3> color = DOT_COLOR, float x = 0, float y = 0, bool alive = true);
+    HumanPlayer(int width = DOT_WIDTH, int height = DOT_HEIGHT, SDL_Color color = DOT_COLOR, float x = 0, float y = 0, bool alive = true);
     void update(Game& game) override;
-}; 
+};
+
+std::pair<std::vector<std::vector<float>>, std::vector<std::vector<float>>> random_genes_and_biases(); 

@@ -10,6 +10,8 @@
 #include <utility>
 #include "Settings.h"
 #include <iostream>
+#include <omp.h> // Enable OpenMP parallelization
+#include <iomanip>
 
 #define MIN_FOOD_FOR_REPRO 2
 #define MIN_LIFETIME_FOR_REPRO 2000
@@ -103,49 +105,16 @@ bool Game::inLocation(int x1, int y1, int w1, int h1, int x2, int y2, int w2, in
     return !(x1 + w1 < x2 || x1 > x2 + w2 || y1 + h1 < y2 || y1 > y2 + h2);
 }
 
-void Game::newPlayer(int number, int width, int height, std::array<int, 3> color, float speed, bool random_color, bool random_size) {
-    for (int i = 0; i < number; ++i) {
-        if (random_color) {
-            color = {rand() % 256, rand() % 256, rand() % 256};
-        }
-        float x = (rand() % (this->width - width)) + width / 2.0f;
-        float y = (rand() % (this->height - height)) + height / 2.0f;
-        // Check collision with existing players
-        bool valid = true;
-        for (auto* player : players) {
-            float dx = x - player->x;
-            float dy = y - player->y;
-            float min_dist = (width + player->width) / 2.0f;
-            if (std::sqrt(dx * dx + dy * dy) < min_dist) {
-                valid = false;
-                break;
-            }
-        }
-        if (!valid) { --i; continue; }
-        // Check collision with food
-        for (auto* food : foods) {
-            float dx = x - food->x;
-            float dy = y - food->y;
-            float min_dist = (width + food->width) / 2.0f;
-            if (std::sqrt(dx * dx + dy * dy) < min_dist) {
-                valid = false;
-                break;
-            }
-        }
-        if (!valid) { --i; continue; }
-        if (!Player::gene_pool.empty()) {
-            auto entry = Player::sample_gene_from_pool();
-            players.push_back(new Player(entry.genes, width, height, color, x, y));
-        } else {
-            players.push_back(new Player(width, height, color, x, y));
-        }
-    }
+void Game::newPlayer(const std::vector<std::vector<float>>& genes, const std::vector<std::vector<float>>& biases, int width, int height, SDL_Color color, float speed) {
+    float x = (rand() % (this->width - width)) + width / 2.0f;
+    float y = (rand() % (this->height - height)) + height / 2.0f;
+    players.push_back(new Player(genes, biases, width, height, color, x, y));
 }
 
-void Game::newHunter(int number, int width, int height, std::array<int, 3> color, float speed, bool random_color, bool random_size) {
+void Game::newHunter(int number, int width, int height, SDL_Color color, float speed, bool random_color, bool random_size) {
     for (int i = 0; i < number; ++i) {
         if (random_color) {
-            color = {rand() % 256, rand() % 256, rand() % 256};
+            color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
         }
         float x = (rand() % (this->width - width)) + width / 2.0f;
         float y = (rand() % (this->height - height)) + height / 2.0f;
@@ -215,8 +184,8 @@ void Game::maintain_population() {
     static int generation = 0;
     static float best_fitness = 0.0f;
     static int generations_since_improvement = 0;
-    static constexpr int ADAPTIVE_MUTATION_PATIENCE = 20;
-    static constexpr float ADAPTIVE_MUTATION_FACTOR = 2.0f;
+    static std::vector<Player*> sorted_alive;
+    static std::vector<Player*> elites;
     // fitness calculation lambda
     auto calc_fitness = [this](Player* p, float w_food, float w_life, float w_explore, float w_total_players, float min_food, float min_life, float early_death_time, float early_death_penalty) {
         float exploration_bonus = w_explore * p->visited_cells.size();
@@ -237,8 +206,7 @@ void Game::maintain_population() {
         for (auto* h : hunters) if (h == p) is_hunter = true;
         if (!p->alive && !is_hunter) {
             if (!p->is_human) {
-                // Use the same weights/thresholds as in sorting for consistency
-                float fitness = calc_fitness(p, 10.0f, 1.0f, 3.0f, 5.0f, 5, 2000, 1000, 50.0f);
+                float fitness = calc_fitness(p, FITNESS_WEIGHT_FOOD, FITNESS_WEIGHT_LIFE, FITNESS_WEIGHT_EXPLORE, FITNESS_WEIGHT_PLAYERS, FITNESS_MIN_FOOD, FITNESS_MIN_LIFE, FITNESS_EARLY_DEATH_TIME, FITNESS_EARLY_DEATH_PENALTY);
                 if (fitness >= MIN_FITNESS_FOR_GENE_POOL) {
                     Player::try_insert_gene_to_pool(fitness, p->genes, p->biases);
                 }
@@ -256,42 +224,94 @@ void Game::maintain_population() {
         for (auto* h : hunters) if (h == p) is_hunter = true;
         if (p->alive && !is_hunter) alive_bots.push_back(p);
     }
-    // Dynamic elitism: top ELITISM_PERCENT
-    std::vector<Player*> sorted_alive;
-    for (auto* p : alive_bots) {
-        if (!p->is_human) sorted_alive.push_back(p);
-    }
-    std::sort(sorted_alive.begin(), sorted_alive.end(), [this, &calc_fitness](Player* a, Player* b) {
-        float fitness_a = calc_fitness(a, 10.0f, 1.0f, 3.0f, 5.0f, 5, 2000, 1000, 50.0f);
-        float fitness_b = calc_fitness(b, 10.0f, 1.0f, 3.0f, 5.0f, 5, 2000, 1000, 50.0f);
-        return fitness_a > fitness_b;
-    });
-    int n_elites = std::max(1, int(ELITISM_PERCENT * float(MIN_BOT)));
-    std::vector<Player*> elites;
-    for (int i = 0; i < n_elites && i < (int)sorted_alive.size(); ++i) {
-        if (sorted_alive[i]->totalFoodEaten >= MIN_FOOD_FOR_REPRO && sorted_alive[i]->lifeTime >= MIN_LIFETIME_FOR_REPRO) {
-            elites.push_back(sorted_alive[i]);
+    // Only run heavy operations at intervals
+    if (generation % GENE_POOL_CHECK_INTERVAL == 0) {
+        // Dynamic elitism: select elites for reproduction
+        sorted_alive.clear();
+        for (auto* p : alive_bots) {
+            if (!p->is_human) sorted_alive.push_back(p);
         }
-    }
-    int clones_added = 0;
-    std::vector<bool> elite_cloned(n_elites, false);
-    // Prune gene pool every GENE_POOL_PRUNE_INTERVAL generations (diversity-based)
-    if (generation % GENE_POOL_PRUNE_INTERVAL == 0 && Player::gene_pool.size() > GENE_POOL_SIZE) {
-        Player::prune_gene_pool_diversity(GENE_POOL_SIZE, 0.2f);
-    }
-    // Adaptive mutation: increase if no improvement
-    float current_best = 0.0f;
-    for (const auto& entry : Player::gene_pool) {
-        if (entry.fitness > current_best) current_best = entry.fitness;
-    }
-    if (current_best > best_fitness) {
-        best_fitness = current_best;
-        generations_since_improvement = 0;
-        Player::adaptive_mutation_rate = MUTATION_RATE;
-    } else {
-        generations_since_improvement++;
-        if (generations_since_improvement > ADAPTIVE_MUTATION_PATIENCE) {
-            Player::adaptive_mutation_rate = MUTATION_RATE * ADAPTIVE_MUTATION_FACTOR;
+        std::sort(sorted_alive.begin(), sorted_alive.end(), [this, &calc_fitness](Player* a, Player* b) {
+            float fitness_a = calc_fitness(a, FITNESS_WEIGHT_FOOD, FITNESS_WEIGHT_LIFE, FITNESS_WEIGHT_EXPLORE, FITNESS_WEIGHT_PLAYERS, FITNESS_MIN_FOOD, FITNESS_MIN_LIFE, FITNESS_EARLY_DEATH_TIME, FITNESS_EARLY_DEATH_PENALTY);
+            float fitness_b = calc_fitness(b, FITNESS_WEIGHT_FOOD, FITNESS_WEIGHT_LIFE, FITNESS_WEIGHT_EXPLORE, FITNESS_WEIGHT_PLAYERS, FITNESS_MIN_FOOD, FITNESS_MIN_LIFE, FITNESS_EARLY_DEATH_TIME, FITNESS_EARLY_DEATH_PENALTY);
+            return fitness_a > fitness_b;
+        });
+        // Select elites for reproduction (use TOP_ALIVE_TO_INSERT as the number of elites)
+        elites.clear();
+        int n_elites = std::min(TOP_ALIVE_TO_INSERT, (int)sorted_alive.size());
+        for (int i = 0; i < n_elites; ++i) {
+            if (sorted_alive[i]->totalFoodEaten >= FITNESS_MIN_FOR_REPRO && sorted_alive[i]->lifeTime >= FITNESS_MIN_LIFETIME_FOR_REPRO) {
+                elites.push_back(sorted_alive[i]);
+            }
+        }
+        // Insert all elites into gene pool
+        int inserted = 0;
+        for (Player* p : elites) {
+            float fitness = calc_fitness(p, FITNESS_WEIGHT_FOOD, FITNESS_WEIGHT_LIFE, FITNESS_WEIGHT_EXPLORE, FITNESS_WEIGHT_PLAYERS, FITNESS_MIN_FOOD, FITNESS_MIN_LIFE, FITNESS_EARLY_DEATH_TIME, FITNESS_EARLY_DEATH_PENALTY);
+            if (fitness >= MIN_FITNESS_FOR_GENE_POOL) {
+                Player::try_insert_gene_to_pool(fitness, p->genes, p->biases);
+                ++inserted;
+            }
+        }
+        // Optionally, insert additional top non-elite players to reach TOP_ALIVE_TO_INSERT
+        for (int i = 0; i < (int)sorted_alive.size() && inserted < TOP_ALIVE_TO_INSERT; ++i) {
+            Player* p = sorted_alive[i];
+            if (std::find(elites.begin(), elites.end(), p) == elites.end()) {
+                float fitness = calc_fitness(p, FITNESS_WEIGHT_FOOD, FITNESS_WEIGHT_LIFE, FITNESS_WEIGHT_EXPLORE, FITNESS_WEIGHT_PLAYERS, FITNESS_MIN_FOOD, FITNESS_MIN_LIFE, FITNESS_EARLY_DEATH_TIME, FITNESS_EARLY_DEATH_PENALTY);
+                if (fitness >= MIN_FITNESS_FOR_GENE_POOL) {
+                    Player::try_insert_gene_to_pool(fitness, p->genes, p->biases);
+                    ++inserted;
+                }
+            }
+        }
+        // Prune gene pool
+        Player::prune_gene_pool_diversity(FITNESS_DIVERSITY_PRUNE_MIN_DIST);
+        // Diversity and mutation rate logic
+        float current_best = 0.0f;
+        float diversity_sum = 0.0f;
+        float diversity_min = 1e9, diversity_max = 0.0f;
+        int diversity_count = 0;
+        float avg_fitness = 0.0f;
+        float last_fitness = Player::get_last_inserted_fitness();
+        // Calculate fitness stats for alive players using the same fitness function
+        if (!sorted_alive.empty()) {
+            float sum_fitness = 0.0f;
+            float best_fitness_alive = 0.0f;
+            for (size_t i = 0; i < sorted_alive.size(); ++i) {
+                float fit = calc_fitness(sorted_alive[i], FITNESS_WEIGHT_FOOD, FITNESS_WEIGHT_LIFE, FITNESS_WEIGHT_EXPLORE, FITNESS_WEIGHT_PLAYERS, FITNESS_MIN_FOOD, FITNESS_MIN_LIFE, FITNESS_EARLY_DEATH_TIME, FITNESS_EARLY_DEATH_PENALTY);
+                sum_fitness += fit;
+                if (fit > best_fitness_alive) best_fitness_alive = fit;
+            }
+            avg_fitness = sum_fitness / sorted_alive.size();
+            current_best = best_fitness_alive;
+        }
+        // Calculate diversity for gene pool
+        for (size_t i = 0; i < Player::gene_pool.size(); ++i) {
+            for (size_t j = i + 1; j < Player::gene_pool.size(); ++j) {
+                float dist = Player::genetic_distance(Player::gene_pool[i], Player::gene_pool[j]);
+                diversity_sum += dist;
+                if (dist < diversity_min) diversity_min = dist;
+                if (dist > diversity_max) diversity_max = dist;
+                diversity_count++;
+            }
+        }
+        float avg_diversity = (diversity_count > 0) ? (diversity_sum / diversity_count) : 0.0f;
+        float diversity_threshold = 0.15f;
+        float prev_mutation_rate = Player::adaptive_mutation_rate;
+        if (current_best > best_fitness) {
+            best_fitness = current_best;
+            generations_since_improvement = 0;
+            Player::adaptive_mutation_rate = MUTATION_RATE;
+        } else {
+            generations_since_improvement++;
+            if (generations_since_improvement > ADAPTIVE_MUTATION_PATIENCE ) {
+                if (avg_diversity < diversity_threshold || generations_since_improvement > ADAPTIVE_MUTATION_PATIENCE) {
+                    Player::adaptive_mutation_rate = std::min(Player::adaptive_mutation_rate * ADAPTIVE_MUTATION_FACTOR, MAX_MUTATION_RATE);
+                }
+                generations_since_improvement = 0;
+            }
+        }
+        if (Player::adaptive_mutation_rate != prev_mutation_rate) {
         }
     }
     // Fill up population
@@ -299,19 +319,21 @@ void Game::maintain_population() {
         // 5% chance: insert Hall of Fame agent
         if (!Player::hall_of_fame.empty() && (rand() % 100 < 5)) {
             auto hof = Player::sample_hall_of_fame();
-            std::array<int, 3> color = {rand() % 256, rand() % 256, rand() % 256};
-            Player* hof_agent = new Player(hof.genes, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), -1);
-            hof_agent->biases = hof.biases;
+            SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+            auto [genes, biases] = random_genes_and_biases();
+            Player* hof_agent = new Player(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), -1);
             players.push_back(hof_agent);
         } else if ((rand() % 100 < 30) || alive_bots.empty()) {
-            std::array<int, 3> color = {rand() % 256, rand() % 256, rand() % 256};
-            players.push_back(new Player(DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));
+            SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+            auto [genes, biases] = random_genes_and_biases();
+            players.push_back(new Player(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));
         } else {
             // 40% chance: clone an elite
             if (!elites.empty() && (rand() % 100 < 40)) {
                 int e = rand() % elites.size();
-                Player* clone = new Player(elites[e]->genes, DOT_WIDTH, DOT_HEIGHT, elites[e]->color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), elites[e]->parent_id);
-                clone->biases = elites[e]->biases;
+                auto [genes, biases] = random_genes_and_biases();
+                SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+                Player* clone = new Player(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), elites[e]->parent_id);
                 players.push_back(clone);
             } else if (!Player::gene_pool.empty()) {
                 // 30% chance: crossover from gene pool using tournament selection
@@ -327,8 +349,9 @@ void Game::maintain_population() {
                 }
                 if (tournament.size() < 2) {
                     // fallback: inject random
-                    std::array<int, 3> color = {rand() % 256, rand() % 256, rand() % 256};
-                    players.push_back(new Player(DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));
+                    SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+                    auto [genes, biases] = random_genes_and_biases();
+                    players.push_back(new Player(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));
                 } else {
                     // Use tournament selection
                     const Player::GeneEntry* parent1 = *std::max_element(tournament.begin(), tournament.end(), [](const Player::GeneEntry* a, const Player::GeneEntry* b) { return a->fitness < b->fitness; });
@@ -336,22 +359,20 @@ void Game::maintain_population() {
                     std::vector<const Player::GeneEntry*> tournament2;
                     for (const auto* entry : tournament) if (entry != parent1) tournament2.push_back(entry);
                     const Player::GeneEntry* parent2 = *std::max_element(tournament2.begin(), tournament2.end(), [](const Player::GeneEntry* a, const Player::GeneEntry* b) { return a->fitness < b->fitness; });
-                    std::array<int, 3> color = {rand() % 256, rand() % 256, rand() % 256};
+                    SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
                     auto new_genes = crossover(parent1->genes, parent2->genes);
                     auto new_biases = crossover_biases(parent1->biases, parent2->biases);
-                    // Adaptive mutation: higher if population is less diverse
-                    float mutation_rate = Player::adaptive_mutation_rate;
-                    if (Player::gene_pool.size() < GENE_POOL_SIZE / 2) mutation_rate *= 2.0f;
-                    mutate_genes(new_genes, int(10 * mutation_rate));
-                    mutate_biases(new_biases, int(10 * mutation_rate));
-                    Player* child = new Player(new_genes, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), -1);
-                    child->biases = new_biases;
+                    int nMutate = int(MUTATION_ATTEMPTS * Player::adaptive_mutation_rate);
+                    mutate_genes(new_genes, nMutate);
+                    mutate_biases(new_biases, nMutate);
+                    Player* child = new Player(new_genes, new_biases, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height), -1);
                     players.push_back(child);
                 }
             } else {
                 // fallback: inject random
-                std::array<int, 3> color = {rand() % 256, rand() % 256, rand() % 256};
-                players.push_back(new Player(DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));
+                SDL_Color color = {static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), static_cast<Uint8>(rand() % 256), 255};
+                auto [genes, biases] = random_genes_and_biases();
+                players.push_back(new Player(genes, biases, DOT_WIDTH, DOT_HEIGHT, color, static_cast<float>(rand() % width), static_cast<float>(rand() % height)));
             }
         }
         alive_bots.push_back(players.back());
@@ -414,4 +435,4 @@ std::vector<Food*> Game::get_nearby_food(float x, float y) {
         }
     }
     return result;
-} 
+}
