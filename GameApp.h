@@ -8,7 +8,7 @@
 
 class GameApp {
 public:
-    GameApp();
+    GameApp(bool headless = false, const std::string& gene_pool_file = "gene_pool.txt", int island_id = -1, const std::string& migration_dir = "");
     ~GameApp();
     bool init();
     void run();
@@ -50,4 +50,10 @@ private:
     Uint32 sim_start_time = 0;
     Uint32 last_gene_pool_save = 0;
     const Uint32 GENE_POOL_SAVE_INTERVAL = 5000;
+    // New members for headless mode and gene pool file
+    bool headless = false;
+    std::string gene_pool_file = "gene_pool.txt";
+    // Migration support
+    int island_id = -1;
+    std::string migration_dir = "";
 }; 

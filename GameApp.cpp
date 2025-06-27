@@ -15,10 +15,13 @@
 #include "Game.h"
 #include "Settings.h"
 #include <cmath>
+#include <filesystem>
 
 extern int game_time_units;
 
-GameApp::GameApp() {}
+GameApp::GameApp(bool headless, const std::string& gene_pool_file, int island_id, const std::string& migration_dir)
+    : headless(headless), gene_pool_file(gene_pool_file), island_id(island_id), migration_dir(migration_dir) {}
+
 GameApp::~GameApp() {}
 
 bool GameApp::init() {
@@ -40,61 +43,44 @@ bool GameApp::init() {
     print_kv("PLAYER_MIN_SPEED_FACTOR", PLAYER_MIN_SPEED_FACTOR); print_kv("PLAYER_SIZE_SPEED_EXPONENT", PLAYER_SIZE_SPEED_EXPONENT); print_kv("PLAYER_GROWTH_EXPONENT", PLAYER_GROWTH_EXPONENT);
     print_section("[Food]");
     print_kv("FOOD_WIDTH", FOOD_WIDTH); print_kv("FOOD_HEIGHT", FOOD_HEIGHT); print_kv("FOOD_APPEND", FOOD_APPEND);
-    print_kv("EATEN_FACTOR", EATEN_FACTOR); print_kv("EATEN_ADD", EATEN_ADD);
-    print_section("[Game Mechanics]");
-    print_kv("KILL_TIME", KILL_TIME); print_kv("NUMBER_OF_FOODS", NUMBER_OF_FOODS); print_kv("HUNTERS", HUNTERS);
-    print_kv("HUNTER_WIDTH", HUNTER_WIDTH); print_kv("HUNTER_HEIGHT", HUNTER_HEIGHT); print_kv("MIN_BOT", MIN_BOT); print_kv("KILL", KILL);
-    print_section("[Player Controls]");
-    print_kv("PLAYER_ENABLED", PLAYER_ENABLED);
-    print_section("[Evolution]");
-    print_kv("MITOSIS", MITOSIS);
-    print_section("[Neural Network]");
-    print_kv("NN_INPUTS", NN_INPUTS); print_kv("NN_H1", NN_H1); print_kv("NN_H2", NN_H2); print_kv("NN_H3", NN_H3); print_kv("NN_OUTPUTS", NN_OUTPUTS);
-    print_section("[Genetic Algorithm]");
-    print_kv("GENE_POOL_SIZE", GENE_POOL_SIZE); print_kv("ELITISM_PERCENT", ELITISM_PERCENT); print_kv("MUTATION_RATE", MUTATION_RATE);
-    print_kv("MUTATION_ATTEMPTS", MUTATION_ATTEMPTS); print_kv("MUTATION_MAGNITUDE", MUTATION_MAGNITUDE); print_kv("LARGE_MUTATION_PROB", LARGE_MUTATION_PROB); print_kv("LARGE_MUTATION_SCALE", LARGE_MUTATION_SCALE);
-    print_kv("ADAPTIVE_MUTATION_PATIENCE", ADAPTIVE_MUTATION_PATIENCE); print_kv("MAX_MUTATION_RATE", MAX_MUTATION_RATE); print_kv("ADAPTIVE_MUTATION_FACTOR", ADAPTIVE_MUTATION_FACTOR);
-    print_kv("GENE_POOL_CHECK_INTERVAL", GENE_POOL_CHECK_INTERVAL); print_kv("PRUNE_RATE", PRUNE_RATE);
-    print_section("[Hunger/Food Decrease]");
-    print_kv("HUNGER_BASE", HUNGER_BASE); print_kv("HUNGER_SCALE", HUNGER_SCALE); print_kv("HUNGER_EXPONENT", HUNGER_EXPONENT); print_kv("HUNGER_MIN", HUNGER_MIN); print_kv("HUNGER_MAX", HUNGER_MAX);
-    print_section("[Wall Penalty]");
-    print_kv("WALL_PENALTY_PER_FRAME", WALL_PENALTY_PER_FRAME);
     print_section("[Fitness]");
-    print_kv("TOP_ALIVE_TO_INSERT", TOP_ALIVE_TO_INSERT);
-    print_kv("FITNESS_WEIGHT_FOOD", FITNESS_WEIGHT_FOOD); print_kv("FITNESS_WEIGHT_LIFE", FITNESS_WEIGHT_LIFE); print_kv("FITNESS_WEIGHT_EXPLORE", FITNESS_WEIGHT_EXPLORE); print_kv("FITNESS_WEIGHT_PLAYERS", FITNESS_WEIGHT_PLAYERS);
+    print_kv("FITNESS_WEIGHT_FOOD", FITNESS_WEIGHT_FOOD); print_kv("FITNESS_WEIGHT_LIFE", FITNESS_WEIGHT_LIFE);
+    print_kv("FITNESS_WEIGHT_EXPLORE", FITNESS_WEIGHT_EXPLORE); print_kv("FITNESS_WEIGHT_PLAYERS", FITNESS_WEIGHT_PLAYERS);
     print_kv("FITNESS_MIN_FOOD", FITNESS_MIN_FOOD); print_kv("FITNESS_MIN_LIFE", FITNESS_MIN_LIFE); print_kv("FITNESS_EARLY_DEATH_TIME", FITNESS_EARLY_DEATH_TIME); print_kv("FITNESS_EARLY_DEATH_PENALTY", FITNESS_EARLY_DEATH_PENALTY);
     print_kv("FITNESS_MIN_FOR_REPRO", FITNESS_MIN_FOR_REPRO); print_kv("FITNESS_MIN_LIFETIME_FOR_REPRO", FITNESS_MIN_LIFETIME_FOR_REPRO);
     print_kv("FITNESS_DIVERSITY_PRUNE_MIN_DIST", FITNESS_DIVERSITY_PRUNE_MIN_DIST); print_kv("MIN_FITNESS_FOR_GENE_POOL", MIN_FITNESS_FOR_GENE_POOL);
     std::cout << "+" << hline << "+\n\n";
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
-        return false;
-    }
-    if (TTF_Init() == -1) {
-        std::cerr << "SDL_ttf could not initialize! TTF_Error: " << TTF_GetError() << std::endl;
-        SDL_Quit();
-        return false;
-    }
-    window = SDL_CreateWindow("C++ AI Simulation", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH + 200, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
-    if (!window) {
-        std::cerr << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
-        SDL_Quit();
-        return false;
-    }
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    if (!renderer) {
-        std::cerr << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return false;
-    }
-    font = TTF_OpenFont("arial.ttf", 18);
-    if (!font) {
-        std::cerr << "Failed to load font! TTF_Error: " << TTF_GetError() << std::endl;
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return false;
+    if (!headless) {
+        if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+            std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+            return false;
+        }
+        if (TTF_Init() == -1) {
+            std::cerr << "SDL_ttf could not initialize! TTF_Error: " << TTF_GetError() << std::endl;
+            SDL_Quit();
+            return false;
+        }
+        window = SDL_CreateWindow("C++ AI Simulation", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH + 200, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+        if (!window) {
+            std::cerr << "Window could not be created! SDL_Error: " << SDL_GetError() << std::endl;
+            SDL_Quit();
+            return false;
+        }
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+        if (!renderer) {
+            std::cerr << "Renderer could not be created! SDL_Error: " << SDL_GetError() << std::endl;
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            return false;
+        }
+        font = TTF_OpenFont("arial.ttf", 18);
+        if (!font) {
+            std::cerr << "Failed to load font! TTF_Error: " << TTF_GetError() << std::endl;
+            SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            return false;
+        }
     }
     // Initialize simulation parameters
     g_bot_count = MIN_BOT;
@@ -116,7 +102,7 @@ bool GameApp::init() {
     sim_start_time = SDL_GetTicks();
     last_gene_pool_save = SDL_GetTicks();
     // Load gene pool
-    Player::load_gene_pool("gene_pool.txt");
+    Player::load_gene_pool(gene_pool_file);
     // Create game
     game = new Game(renderer);
     restart_simulation();
@@ -124,12 +110,14 @@ bool GameApp::init() {
 }
 
 void GameApp::cleanup() {
-    Player::save_gene_pool("gene_pool.txt");
-    if (font) TTF_CloseFont(font);
-    if (renderer) SDL_DestroyRenderer(renderer);
-    if (window) SDL_DestroyWindow(window);
-    TTF_Quit();
-    SDL_Quit();
+    Player::save_gene_pool(gene_pool_file);
+    if (!headless) {
+        if (font) TTF_CloseFont(font);
+        if (renderer) SDL_DestroyRenderer(renderer);
+        if (window) SDL_DestroyWindow(window);
+        TTF_Quit();
+        SDL_Quit();
+    }
     if (game) delete game;
 }
 
@@ -210,7 +198,110 @@ std::vector<SettingSlider> sliders;
 std::vector<SettingToggle> toggles;
 int dragging_slider = -1;
 
+// Helper for migration file naming
+std::string get_migration_out_file(int island_id, const std::string& migration_dir) {
+    return migration_dir + "/migrants_from_" + std::to_string(island_id) + ".dat";
+}
+std::string get_migration_in_file(int island_id, const std::string& migration_dir) {
+    return migration_dir + "/migrants_to_" + std::to_string(island_id) + ".dat";
+}
+
+// Helper to export/import a subset of the gene pool
+void export_migrants(const std::string& filename, int num = 5) {
+    std::ofstream ofs(filename);
+    int count = 0;
+    for (const auto& entry : Player::gene_pool) {
+        if (count++ >= num) break;
+        ofs << entry.fitness << "\n";
+        for (const auto& layer : entry.genes) {
+            for (float w : layer) ofs << w << ' ';
+            ofs << '\n';
+        }
+        for (const auto& bias : entry.biases) {
+            for (float b : bias) ofs << b << ' ';
+            ofs << '\n';
+        }
+        ofs << "END\n";
+    }
+}
+void import_migrants(const std::string& filename) {
+    std::ifstream ifs(filename);
+    if (!ifs) return;
+    std::string line;
+    while (std::getline(ifs, line)) {
+        if (line == "END") continue;
+        float fitness = std::stof(line);
+        std::vector<std::vector<float>> genes, biases;
+        for (int l = 0; l < 4; ++l) {
+            std::getline(ifs, line);
+            std::istringstream iss(line);
+            std::vector<float> layer;
+            float w;
+            while (iss >> w) layer.push_back(w);
+            genes.push_back(layer);
+        }
+        for (int l = 0; l < 4; ++l) {
+            std::getline(ifs, line);
+            std::istringstream iss(line);
+            std::vector<float> bias;
+            float b;
+            while (iss >> b) bias.push_back(b);
+            biases.push_back(bias);
+        }
+        Player::try_insert_gene_to_pool(fitness, genes, biases);
+    }
+}
+
+void log_fitness(int island_id, const std::string& migration_dir) {
+    std::string log_file = migration_dir + "/fitness_log_island_" + std::to_string(island_id) + ".txt";
+    std::ofstream ofs(log_file, std::ios::app);
+    ofs << "Best: " << Player::display_best_fitness
+        << ", Avg: " << Player::display_avg_fitness
+        << ", Last: " << Player::display_last_fitness
+        << ", PoolSize: " << Player::gene_pool.size()
+        << ", Diversity: " << Player::display_avg_diversity
+        << ", Time: " << SDL_GetTicks() << std::endl;
+}
+
 void GameApp::run() {
+    static const int MIGRATION_INTERVAL = 10000; // generations
+    static const int MIGRANT_COUNT = 10;
+    int generation = 0;
+    if (headless) {
+        quit = false;
+        sim_start_time = SDL_GetTicks();
+        last_gene_pool_save = SDL_GetTicks();
+        while (!quit) {
+            // Run simulation logic only
+            game->update();
+            ++generation;
+            // Migration logic
+            if (!migration_dir.empty() && island_id >= 0 && generation % MIGRATION_INTERVAL == 0) {
+                // Export migrants
+                std::string out_file = get_migration_out_file(island_id, migration_dir);
+                export_migrants(out_file, MIGRANT_COUNT);
+                // Wait for incoming migrants
+                std::string in_file = get_migration_in_file(island_id, migration_dir);
+                int wait_count = 0;
+                while (!std::filesystem::exists(in_file) && wait_count < 10000) { // up to ~10s
+                    SDL_Delay(1);
+                    ++wait_count;
+                }
+                if (std::filesystem::exists(in_file)) {
+                    import_migrants(in_file);
+                    std::filesystem::remove(in_file);
+                }
+                // Log fitness and gene pool distribution
+                log_fitness(island_id, migration_dir);
+            }
+            // Save gene pool periodically
+            if (SDL_GetTicks() - last_gene_pool_save > GENE_POOL_SAVE_INTERVAL) {
+                Player::save_gene_pool(gene_pool_file);
+                last_gene_pool_save = SDL_GetTicks();
+            }
+        }
+        return;
+    }
     SDL_Event e;
     quit = false;
     paused = true;
@@ -413,7 +504,7 @@ void GameApp::run() {
             }
         }
         if (SDL_GetTicks() - last_gene_pool_save > GENE_POOL_SAVE_INTERVAL) {
-            Player::save_gene_pool("gene_pool.txt");
+            Player::save_gene_pool(gene_pool_file);
             last_gene_pool_save = SDL_GetTicks();
         }
         SDL_SetRenderDrawColor(renderer, 10, 10, 10, 255);

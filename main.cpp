@@ -11,6 +11,8 @@
 #include <map>
 #include "Settings.h"
 #include "GameApp.h"
+#include <cstring>
+#include <iostream>
 
 // Helper to render text
 void renderText(SDL_Renderer* renderer, TTF_Font* font, const std::string& text, int x, int y, SDL_Color color) {
@@ -105,9 +107,33 @@ void restart_simulation(Game& game, SDL_Renderer* renderer, const std::vector<st
 }
 
 int main(int argc, char* argv[]) {
-    GameApp app;
+    int island_id = -1;
+    std::string gene_pool_file = "gene_pool.txt";
+    std::string migration_dir = "";
+    bool headless = false;
+    // Parse command-line arguments
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--island_id") == 0 && i + 1 < argc) {
+            island_id = std::stoi(argv[++i]);
+        } else if (strcmp(argv[i], "--gene_pool_file") == 0 && i + 1 < argc) {
+            gene_pool_file = argv[++i];
+        } else if (strcmp(argv[i], "--migration_dir") == 0 && i + 1 < argc) {
+            migration_dir = argv[++i];
+        } else if (strcmp(argv[i], "--headless") == 0) {
+            headless = true;
+        }
+    }
+    std::cout << "[main] island_id=" << island_id << ", gene_pool_file=" << gene_pool_file << ", migration_dir=" << migration_dir << ", headless=" << headless << std::endl;
+    GameApp app(headless, gene_pool_file, island_id, migration_dir);
     if (!app.init()) return 1;
     app.run();
     app.cleanup();
     return 0;
-} 
+}
+
+// Command-line arguments:
+//   --island_id <int>         : Unique ID for this island (used for migration file naming)
+//   --gene_pool_file <file>   : Path to the gene pool file for this island
+//   --migration_dir <dir>     : Directory for migration files (shared with master)
+//   --headless                : Run in headless mode (no rendering, for master-launched islands)
+// Example: ./sim.exe --island_id 1 --gene_pool_file gene_pool_1.txt --migration_dir ./migration --headless 
